@@ -146,6 +146,18 @@ async function processImage(imageData, operation) {
                 case 'blur':
                     ctx.filter = 'blur(5px)';
                     break;
+
+                case 'invert':
+                    ctx.filter = 'invert(100%)';
+                    break;
+
+                case 'sepia':
+                    ctx.filter = 'sepia(100%)';
+                    break;
+
+                case 'contrast':
+                    ctx.filter = 'contrast(200%)';
+                    break;
             }
             
             // Draw image with the applied filters/transformations
