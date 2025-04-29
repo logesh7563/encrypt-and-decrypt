@@ -9,10 +9,15 @@ const API_BASE_URL = 'http://localhost:8085';
  * Handles image upload from the file input
  */
 async function handleUpload() {
-    const fileInput = document.getElementById('imageInput');
+    const fileInput = document.getElementById('encryptedImageInput');
     const statusElement = document.getElementById('uploadStatus');
     
     try {
+        // Check if the file input element exists
+        if (!fileInput) {
+            throw new Error('File input element not found. Please check the HTML structure.');
+        }
+
         // Check if a file was selected
         if (!fileInput.files || fileInput.files.length === 0) {
             statusElement.textContent = "Please select an image file first.";
@@ -25,9 +30,9 @@ async function handleUpload() {
         
         const file = fileInput.files[0];
         
-        // Verify it's an image
-        if (!file.type.startsWith('image/')) {
-            statusElement.textContent = "Please select a valid image file.";
+        // Verify it's an image or encrypted file
+        if (!file.type.startsWith('image/') && !file.name.endsWith('.enc')) {
+            statusElement.textContent = "Please select a valid image file or encrypted file (.enc).";
             statusElement.className = "status error";
             return;
         }
@@ -47,8 +52,11 @@ async function handleUpload() {
         originalImageData = await imageLoaded;
         
         // Display the original image
-        const originalImage = document.getElementById('originalImage');
-        originalImage.src = originalImageData;
+        const encryptedImage = document.getElementById('encryptedImage');
+        if (!encryptedImage) {
+            throw new Error('Encrypted image display element not found.');
+        }
+        encryptedImage.src = originalImageData;
         
         statusElement.textContent = "Image uploaded successfully!";
         statusElement.className = "status success";
