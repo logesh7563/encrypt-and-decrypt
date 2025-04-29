@@ -6,6 +6,30 @@
     <title>Secure Image Processing</title>
     <link rel="stylesheet" href="styles.css">
     <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        header {
+            background-color: #2d2d2d;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        header h1 {
+            color: #4CAF50;
+            margin: 0;
+            font-size: 2.5rem;
+        }
+
+        header p {
+            color: #888;
+            margin-top: 0.5rem;
+        }
+
         .mode-selection {
             text-align: center;
             padding: 50px 20px;
@@ -18,53 +42,91 @@
             justify-content: space-around;
             margin-top: 30px;
             flex-wrap: wrap;
+            gap: 2rem;
         }
 
         .mode-card {
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background-color: #2d2d2d;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             padding: 30px;
             margin: 10px;
             width: 300px;
             text-align: center;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid #3d3d3d;
         }
 
         .mode-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.2);
+            border-color: #4CAF50;
         }
 
         .mode-card h3 {
             margin-top: 0;
-            color: #333;
+            color: #4CAF50;
+            font-size: 1.5rem;
         }
 
         .mode-card p {
-            color: #666;
+            color: #888;
             margin-bottom: 25px;
+            line-height: 1.6;
         }
 
         .mode-card img {
             width: 80px;
             height: 80px;
             margin-bottom: 20px;
+            filter: invert(1) hue-rotate(180deg);
+            opacity: 0.9;
+            transition: transform 0.3s ease;
+        }
+
+        .mode-card:hover img {
+            transform: scale(1.1);
         }
 
         .mode-btn {
             display: inline-block;
             background-color: #4CAF50;
             color: white;
-            padding: 10px 20px;
-            border-radius: 4px;
+            padding: 12px 24px;
+            border-radius: 6px;
             text-decoration: none;
             font-weight: bold;
-            transition: background-color 0.3s ease;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
         }
 
         .mode-btn:hover {
             background-color: #45a049;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+            transform: translateY(-2px);
+        }
+
+        footer {
+            background-color: #2d2d2d;
+            color: #888;
+            text-align: center;
+            padding: 1rem;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+        }
+
+        @media (max-width: 768px) {
+            .mode-cards {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .mode-card {
+                width: 90%;
+                max-width: 300px;
+            }
         }
     </style>
 </head>
@@ -96,4 +158,4 @@
         <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
     </footer>
 </body>
-</html> 
+</html>
