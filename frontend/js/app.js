@@ -2,22 +2,14 @@
 let originalImageData = null;
 let processedImageData = null;
 
-// API server URL - configurable based on deployment
-const API_BASE_URL = 'http://localhost:8085';
-
 /**
  * Handles image upload from the file input
  */
 async function handleUpload() {
-    const fileInput = document.getElementById('encryptedImageInput');
+    const fileInput = document.getElementById('imageInput');
     const statusElement = document.getElementById('uploadStatus');
     
     try {
-        // Check if the file input element exists
-        if (!fileInput) {
-            throw new Error('File input element not found. Please check the HTML structure.');
-        }
-
         // Check if a file was selected
         if (!fileInput.files || fileInput.files.length === 0) {
             statusElement.textContent = "Please select an image file first.";
@@ -30,9 +22,9 @@ async function handleUpload() {
         
         const file = fileInput.files[0];
         
-        // Verify it's an image or encrypted file
-        if (!file.type.startsWith('image/') && !file.name.endsWith('.enc')) {
-            statusElement.textContent = "Please select a valid image file or encrypted file (.enc).";
+        // Verify it's an image
+        if (!file.type.startsWith('image/')) {
+            statusElement.textContent = "Please select a valid image file.";
             statusElement.className = "status error";
             return;
         }
@@ -52,11 +44,8 @@ async function handleUpload() {
         originalImageData = await imageLoaded;
         
         // Display the original image
-        const encryptedImage = document.getElementById('encryptedImage');
-        if (!encryptedImage) {
-            throw new Error('Encrypted image display element not found.');
-        }
-        encryptedImage.src = originalImageData;
+        const originalImage = document.getElementById('originalImage');
+        originalImage.src = originalImageData;
         
         statusElement.textContent = "Image uploaded successfully!";
         statusElement.className = "status success";
@@ -206,8 +195,8 @@ async function handleDownload() {
         formData.append('file', blob, 'image.png');
         formData.append('key', encryptionKey);
         
-        // Send to server for encryption
-        const encryptResponse = await fetch(`${API_BASE_URL}/api/encrypt`, {
+        // Send to server for encryption - USING THE ENCRYPT ENDPOINT DIRECTLY
+        const encryptResponse = await fetch('http://localhost:8083/api/encrypt', {
             method: 'POST',
             body: formData
         });
@@ -236,11 +225,7 @@ async function handleDownload() {
         statusElement.className = "status success";
     } catch (error) {
         console.error("Download error:", error);
-        let errorMessage = `Download failed: ${error.message}`;
-        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            errorMessage += '\nPlease check if the server is running and accessible.';
-        }
-        statusElement.textContent = errorMessage;
+        statusElement.textContent = `Download failed: ${error.message}`;
         statusElement.className = "status error";
     }
 }
@@ -270,51 +255,33 @@ async function handleTransmit() {
         statusElement.textContent = "Transmitting image...";
         statusElement.className = "status loading";
         
+        // Create the protocol (http or https)
+        const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
+        const serverUrl = `${protocol}://${serverAddress}/api/upload`;
+        
         // Convert base64 data URL to blob
         const response = await fetch(processedImageData);
         const blob = await response.blob();
         
         // Create form data
         const formData = new FormData();
-        formData.append('file', blob, 'image.png');
+        formData.append('image', blob, 'image.png');
         formData.append('key', encryptionKey);
+        formData.append('id', imageId);
         
-        // First encrypt the image
-        const encryptResponse = await fetch(`${API_BASE_URL}/api/encrypt`, {
+        // Send to server
+        const uploadResponse = await fetch(serverUrl, {
             method: 'POST',
             body: formData
         });
         
-        if (!encryptResponse.ok) {
-            const errorText = await encryptResponse.text();
-            throw new Error(`Encryption error: ${errorText || encryptResponse.status}`);
+        if (!uploadResponse.ok) {
+            throw new Error(`HTTP error! status: ${uploadResponse.status}`);
         }
         
-        // Get the encrypted data
-        const encryptedBlob = await encryptResponse.blob();
-        const encryptedBase64 = await blobToBase64(encryptedBlob);
+        const result = await uploadResponse.json();
         
-        // Transmit the encrypted data
-        const transmitResponse = await fetch(`${API_BASE_URL}/api/transmit`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                encryptedData: encryptedBase64,
-                serverAddr: serverAddress,
-                imageID: imageId
-            })
-        });
-        
-        if (!transmitResponse.ok) {
-            const errorText = await transmitResponse.text();
-            throw new Error(`Transmission error: ${errorText || transmitResponse.status}`);
-        }
-        
-        const result = await transmitResponse.json();
-        
-        statusElement.textContent = `Image transmitted successfully! ID: ${imageId}`;
+        statusElement.textContent = `Image transmitted successfully! ID: ${result.id || imageId}`;
         statusElement.className = "status success";
     } catch (error) {
         console.error("Transmission error:", error);
@@ -323,93 +290,10 @@ async function handleTransmit() {
     }
 }
 
-/**
- * Convert a Blob to base64
- */
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            const base64String = reader.result.split(',')[1];
-            resolve(base64String);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-/**
- * Resets the form and clears any displayed images
- */
-function handleReset() {
-    // Clear input fields
-    document.getElementById('encryptedImageInput').value = '';
-    document.getElementById('decryptionKey').value = '';
-    
-    // Clear displayed images
-    document.getElementById('encryptedImage').src = '';
-    document.getElementById('decryptedImage').src = '';
-    
-    // Clear status messages
-    document.getElementById('uploadStatus').innerHTML = '';
-    document.getElementById('decryptionStatus').innerHTML = '';
-    
-    // Reset progress steps
-    activateStep(1);
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Add event listeners to buttons
-    const uploadBtn = document.getElementById('uploadBtn');
     const processBtn = document.getElementById('processBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const transmitBtn = document.getElementById('transmitBtn');
-    const decryptBtn = document.getElementById('decryptBtn');
-    const processAgainBtn = document.getElementById('processAgainBtn');
-    
-    if (uploadBtn) uploadBtn.addEventListener('click', handleUpload);
-    if (processBtn) processBtn.addEventListener('click', handleProcess);
-    if (downloadBtn) downloadBtn.addEventListener('click', handleDownload);
-    if (transmitBtn) transmitBtn.addEventListener('click', handleTransmit);
-    if (decryptBtn) decryptBtn.addEventListener('click', handleDecrypt);
-    if (processAgainBtn) processAgainBtn.addEventListener('click', handleReset);
-    
-    // Show/hide server options based on source selection
-    const sourceSelect = document.getElementById('sourceSelect');
-    if (sourceSelect) {
-        sourceSelect.addEventListener('change', function() {
-            const serverOptions = document.getElementById('serverOptions');
-            if (serverOptions) {
-                serverOptions.style.display = this.value === 'server' ? 'block' : 'none';
-            }
-        });
-    }
-    
-    // Initialize workflow steps
-    const uploadBtnStep = document.getElementById('uploadBtn');
-    const decryptBtnStep = document.getElementById('decryptBtn');
-    
-    if (uploadBtnStep) {
-        uploadBtnStep.addEventListener('click', function() {
-            activateStep(2);
-        });
-    }
-    
-    if (decryptBtnStep) {
-        decryptBtnStep.addEventListener('click', function() {
-            activateStep(3);
-        });
-    }
-    
     if (processBtn) {
-        processBtn.addEventListener('click', function() {
-            activateStep(3);
-        });
+        processBtn.addEventListener('click', handleProcess);
     }
-    
-    if (transmitBtn) {
-        transmitBtn.addEventListener('click', function() {
-            activateStep(4);
-        });
-    }
+    // Other event bindings...
 });
