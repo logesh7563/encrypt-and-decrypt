@@ -196,7 +196,7 @@ async function handleDownload() {
         formData.append('key', encryptionKey);
         
         // Send to server for encryption - USING THE ENCRYPT ENDPOINT DIRECTLY
-        const encryptResponse = await fetch('http://localhost:8083/api/encrypt', {
+        const encryptResponse = await fetch('http://localhost:8085/api/encrypt', {
             method: 'POST',
             body: formData
         });
@@ -225,7 +225,11 @@ async function handleDownload() {
         statusElement.className = "status success";
     } catch (error) {
         console.error("Download error:", error);
-        statusElement.textContent = `Download failed: ${error.message}`;
+        let errorMessage = `Download failed: ${error.message}`;
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            errorMessage += '\nPlease check if the server is running and accessible.';
+        }
+        statusElement.textContent = errorMessage;
         statusElement.className = "status error";
     }
 }
