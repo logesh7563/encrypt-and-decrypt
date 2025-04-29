@@ -68,14 +68,14 @@ func StartServer() {
 	apiRouter.HandleFunc("/decrypt", handleDecrypt).Methods("POST", "OPTIONS")
 	apiRouter.HandleFunc("/encrypt", handleEncrypt).Methods("POST", "OPTIONS")
 
+	// Serve processed images
+	router.PathPrefix("/processed/").Handler(http.StripPrefix("/processed/", http.FileServer(http.Dir("processed"))))
+
 	// Serve static files from the frontend directory
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("../frontend")))
 
 	// Add middleware for CORS and logging
 	handler := corsMiddleware(loggingMiddleware(router))
-
-	// Start TCP server in a goroutine
-	go StartTCPServer()
 
 	// Start HTTP server
 	log.Printf("HTTP server starting on port %s", HTTPPort)
@@ -197,7 +197,9 @@ func handleProcess(w http.ResponseWriter, r *http.Request) {
 
 	// Get operation from request body
 	var req struct {
-		Operation string `json:"operation"`
+		Operation string  `json:"operation"`
+		Angle     float64 `json:"angle,omitempty"`
+		Radius    float64 `json:"radius,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -225,14 +227,38 @@ func handleProcess(w http.ResponseWriter, r *http.Request) {
 	// Process the image based on the operation
 	var processedImg image.Image
 	switch req.Operation {
+	case "upsidedown":
+		processedImg = FlipUpsideDown(img)
+	case "fliph":
+		processedImg = FlipHorizontal(img)
+	case "rotate":
+		angle := 90.0 // Default angle
+		if req.Angle != 0 {
+			angle = req.Angle
+		}
+		processedImg = RotateArbitrary(img, angle)
+	case "rotate_shear":
+		angle := 90.0 // Default angle
+		if req.Angle != 0 {
+			angle = req.Angle
+		}
+		processedImg = RotateShear(img, angle)
 	case "grayscale":
 		processedImg = ConvertToGrayscale(img)
-	case "flip":
-		processedImg = FlipVertical(img)
-	case "rotate":
-		processedImg = RotateArbitrary(img, 90) // Default 90-degree rotation
-	case "blur":
-		processedImg = ApplyGaussianBlur(img, 2.0) // Default blur radius
+	case "box_blur":
+		radius := 3 // Default radius
+		if req.Radius != 0 {
+			radius = int(req.Radius)
+		}
+		processedImg = ApplyBoxBlur(img, radius)
+	case "gaussian":
+		radius := 2.0 // Default radius
+		if req.Radius != 0 {
+			radius = req.Radius
+		}
+		processedImg = ApplyGaussianBlur(img, radius)
+	case "sobel":
+		processedImg = ApplySobelEdgeDetection(img)
 	default:
 		http.Error(w, "Invalid operation", http.StatusBadRequest)
 		return
@@ -245,9 +271,47 @@ func handleProcess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save the processed image
-	processedFilename := "processed_" + filename
+	// Build a unique processed filename including operation and parameters
+	// Extract name and extension
+	lastDotIndex := strings.LastIndex(filename, ".")
+	var ext, nameOnly string
+	if lastDotIndex == -1 {
+		ext = ""
+		nameOnly = filename
+		log.Printf("Warning: No file extension found in filename: %s", filename)
+	} else {
+		ext = filename[lastDotIndex:]
+		nameOnly = filename[:lastDotIndex]
+	}
+	log.Printf("Processing file: %s (name: %s, extension: %s)", filename, nameOnly, ext)
+	// Determine suffix based on operation
+	var suffix string
+	switch req.Operation {
+	case "rotate", "rotate_shear":
+		angle := req.Angle
+		if angle == 0 {
+			angle = 90.0
+		}
+		suffix = fmt.Sprintf("%s_%.0f", req.Operation, angle)
+	case "box_blur":
+		radius := int(req.Radius)
+		if radius == 0 {
+			radius = 3
+		}
+		suffix = fmt.Sprintf("box_blur_%d", radius)
+	case "gaussian":
+		radius := req.Radius
+		if radius == 0 {
+			radius = 2.0
+		}
+		suffix = fmt.Sprintf("gaussian_%.0f", radius)
+	default:
+		suffix = req.Operation
+	}
+	processedFilename := fmt.Sprintf("%s_%s%s", suffix, nameOnly, ext)
 	processedPath := "processed/" + processedFilename
+
+	// Save the processed image
 	processedFile, err := os.Create(processedPath)
 	if err != nil {
 		log.Printf("Error creating processed file: %v", err)

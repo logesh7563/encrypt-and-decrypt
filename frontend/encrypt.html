@@ -32,11 +32,32 @@
                 <h2>Process Image</h2>
                 <div class="processing-options">
                     <select id="operationSelect">
-                        <option value="flip">Flip Vertically</option>
-                        <option value="rotate">Rotate</option>
+                        <option value="upsidedown">Flip Vertically</option>
+                        <option value="fliph">Flip Horizontally</option>
+                        <option value="rotate">Rotate by Angle</option>
+                        <option value="rotate_shear">Rotate by Angle (Three Shear Matrix)</option>
                         <option value="grayscale">Convert to Grayscale</option>
-                        <option value="blur">Gaussian Blur</option>
+                        <option value="box_blur">Box Blur Matrix</option>
+                        <option value="gaussian">Gaussian Matrix</option>
+                        <option value="sobel">Edge Detection (Sobel Operator)</option>
                     </select>
+
+                    <!-- Dynamic parameter inputs based on operation -->
+                    <div id="parameterInputs" class="parameter-inputs">
+                        <!-- Angle input for rotation operations -->
+                        <div id="angleInput" class="parameter-input" style="display: none;">
+                            <label for="angleValue">Angle (degrees):</label>
+                            <input type="range" id="angleValue" min="0" max="360" value="90" oninput="updateAngleValue(this.value)">
+                            <span id="angleValueDisplay">90°</span>
+                        </div>
+                        
+                        <!-- Radius input for blur operations -->
+                        <div id="radiusInput" class="parameter-input" style="display: none;">
+                            <label for="radiusValue">Blur Radius:</label>
+                            <input type="range" id="radiusValue" min="1" max="10" value="3" oninput="updateRadiusValue(this.value)">
+                            <span id="radiusValueDisplay">3</span>
+                        </div>
+                    </div>
 
                     <div class="encryption-input">
                         <label for="encryptionKey">Encryption Key:</label>
@@ -94,7 +115,45 @@
             document.getElementById('processBtn').addEventListener('click', handleProcess);
             document.getElementById('downloadBtn').addEventListener('click', handleDownload);
             document.getElementById('transmitBtn').addEventListener('click', handleTransmit);
+            
+            // Show parameter inputs if needed based on initial selection
+            document.getElementById('operationSelect').dispatchEvent(new Event('change'));
         });
+
+        function handleUpload() {
+            const fileInput = document.getElementById('imageInput');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files.length) {
+                statusDiv.innerHTML = '<p class="error">Please select an image first</p>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<p class="info">Uploading image, please wait...</p>';
+            
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+            
+            fetch('http://localhost:8083/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = '<p class="success">Image uploaded successfully</p>';
+                    // Show the original image preview
+                    const originalImage = document.getElementById('originalImage');
+                    originalImage.src = URL.createObjectURL(fileInput.files[0]);
+                } else {
+                    statusDiv.innerHTML = '<p class="error">' + (data.message || 'Upload failed') + '</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                statusDiv.innerHTML = '<p class="error">Failed to upload image</p>';
+            });
+        }
 
         function handleEncrypt() {
             const fileInput = document.getElementById('imageInput');
@@ -147,6 +206,226 @@
                 console.error('Encryption error:', error);
                 showError(error.message || 'Failed to encrypt file');
             });
+        }
+
+        // Show/hide parameter inputs based on selected operation
+        document.getElementById('operationSelect').addEventListener('change', function() {
+            const operation = this.value;
+            const angleInput = document.getElementById('angleInput');
+            const radiusInput = document.getElementById('radiusInput');
+            
+            // Hide all parameter inputs
+            angleInput.style.display = 'none';
+            radiusInput.style.display = 'none';
+            
+            // Show relevant inputs based on operation
+            if (operation === 'rotate' || operation === 'rotate_shear') {
+                angleInput.style.display = 'block';
+            }
+            
+            if (operation === 'box_blur' || operation === 'gaussian') {
+                radiusInput.style.display = 'block';
+            }
+        });
+        
+        // Update displayed angle value
+        function updateAngleValue(value) {
+            document.getElementById('angleValueDisplay').textContent = value + '°';
+        }
+        
+        // Update displayed radius value
+        function updateRadiusValue(value) {
+            document.getElementById('radiusValueDisplay').textContent = value;
+        }
+        
+        // Modified process function to include parameters
+        function handleProcess() {
+            const fileInput = document.getElementById('imageInput');
+            const operation = document.getElementById('operationSelect').value;
+            const statusDiv = document.getElementById('processingStatus');
+            
+            if (!fileInput.files.length) {
+                statusDiv.innerHTML = showError('Please select an image first');
+                return;
+            }
+            
+            // Create request data
+            const requestData = {
+                operation: operation
+            };
+            
+            // Add parameters based on operation type
+            if (operation === 'rotate' || operation === 'rotate_shear') {
+                requestData.angle = parseInt(document.getElementById('angleValue').value);
+            }
+            
+            if (operation === 'box_blur' || operation === 'gaussian') {
+                requestData.radius = parseInt(document.getElementById('radiusValue').value);
+            }
+            
+            // Process the image
+            statusDiv.innerHTML = showInfo('Processing image...');
+            
+            fetch('http://localhost:8083/api/process?filename=' + encodeURIComponent(fileInput.files[0].name), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(text || response.statusText);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Show success and the processed filename
+                    statusDiv.innerHTML = showSuccess('Image processed successfully. Filename: ' + data.data);
+                    
+                    // Update image previews
+                    const originalImage = document.getElementById('originalImage');
+                    originalImage.src = URL.createObjectURL(fileInput.files[0]);
+                    
+                    const processedImage = document.getElementById('processedImage');
+                    processedImage.src = 'http://localhost:8083/processed/' + data.data;
+                    
+                    // Show the result section
+                    document.querySelector('.result-section').style.display = 'block';
+                } else {
+                    statusDiv.innerHTML = showError(data.message || 'Processing failed');
+                }
+            })
+            .catch(error => {
+                console.error('Processing error:', error);
+                statusDiv.innerHTML = showError(error.message || 'Failed to process image');
+            });
+        }
+        
+        // Handle download of processed image
+        function handleDownload() {
+            const processedImg = document.getElementById('processedImage');
+            const keyInput = document.getElementById('encryptionKey');
+            const statusDiv = document.querySelector('.result-section .status') || document.getElementById('processingStatus');
+            
+            if (!processedImg.src || processedImg.src === '') {
+                if (statusDiv) statusDiv.innerHTML = showError('No processed image to download');
+                return;
+            }
+            
+            const imageName = processedImg.src.split('/').pop();
+            if (!imageName) {
+                if (statusDiv) statusDiv.innerHTML = showError('Cannot determine image filename');
+                return;
+            }
+            
+            // If encryption key is provided, download encrypted file
+            const useEncryption = keyInput.value.trim() !== '';
+            const downloadUrl = 'http://localhost:8083/api/download?data=' + 
+                encodeURIComponent(imageName) + 
+                (useEncryption ? '&key=' + encodeURIComponent(keyInput.value) : '');
+            
+            // Create a temporary anchor and trigger download
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = useEncryption ? imageName + '.enc' : imageName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            if (statusDiv) statusDiv.innerHTML = showSuccess('Downloading ' + (useEncryption ? 'encrypted' : 'processed') + ' image...');
+        }
+        
+        // Handle image transmission
+        function handleTransmit() {
+            const processedImg = document.getElementById('processedImage');
+            const serverInput = document.getElementById('serverAddress');
+            const imageIdInput = document.getElementById('imageId');
+            const statusDiv = document.getElementById('transmissionStatus');
+            
+            if (!processedImg.src || processedImg.src === '') {
+                statusDiv.innerHTML = showError('No processed image to transmit');
+                return;
+            }
+            
+            if (!serverInput.value.trim()) {
+                statusDiv.innerHTML = showError('Please enter a server address');
+                return;
+            }
+            
+            if (!imageIdInput.value.trim()) {
+                statusDiv.innerHTML = showError('Please enter an image ID');
+                return;
+            }
+            
+            // Get the processed image data from the server
+            const imageName = processedImg.src.split('/').pop();
+            if (!imageName) {
+                statusDiv.innerHTML = showError('Cannot determine image filename');
+                return;
+            }
+            
+            statusDiv.innerHTML = showInfo('Transmitting image...');
+            
+            // Fetch the image, convert to base64, and transmit
+            fetch('http://localhost:8083/processed/' + imageName)
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch image data');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = function() {
+                        // Remove the data URL prefix (data:image/jpeg;base64,)
+                        const base64data = reader.result.split(',')[1];
+                        
+                        // Send to transmit API
+                        fetch('http://localhost:8083/api/transmit', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                encryptedData: base64data,
+                                serverAddr: serverInput.value,
+                                imageID: imageIdInput.value
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                statusDiv.innerHTML = showSuccess('Image transmitted successfully');
+                            } else {
+                                statusDiv.innerHTML = showError(data.message || 'Transmission failed');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Transmission error:', error);
+                            statusDiv.innerHTML = showError('Failed to transmit image');
+                        });
+                    };
+                })
+                .catch(error => {
+                    console.error('Image fetch error:', error);
+                    statusDiv.innerHTML = showError('Failed to fetch image data for transmission');
+                });
+        }
+        
+        // Helper functions for displaying status messages
+        function showError(message) {
+            return '<p class="error">' + message + '</p>';
+        }
+        
+        function showSuccess(message) {
+            return '<p class="success">' + message + '</p>';
+        }
+        
+        function showInfo(message) {
+            return '<p class="info">' + message + '</p>';
         }
     </script>
 </body>
