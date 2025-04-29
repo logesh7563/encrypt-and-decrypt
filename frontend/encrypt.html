@@ -474,6 +474,44 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .operation-params {
+            background-color: rgba(61, 61, 61, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .param-group {
+            margin-bottom: 10px;
+        }
+
+        .param-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+        }
+
+        .param-group input[type="number"] {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            border: 1px solid #4d4d4d;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .param-group input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .param-value {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -524,14 +562,19 @@
                 <h2>Process Image</h2>
                 <div class="processing-options">
                     <select id="operationSelect">
-                        <option value="flip">Flip Vertically</option>
-                        <option value="rotate">Rotate 90°</option>
+                        <option value="flip">Upside Down</option>
+                        <option value="rotate">Rotate by Angle</option>
+                        <option value="shearRotate">Rotate by Angle (Three Shear Matrix)</option>
                         <option value="grayscale">Convert to Grayscale</option>
-                        <option value="blur">Gaussian Blur</option>
-                        <option value="invert">Invert Colors</option>
-                        <option value="sepia">Apply Sepia</option>
-                        <option value="contrast">Adjust Contrast</option>
+                        <option value="boxBlur">Box Blur Matrix</option>
+                        <option value="gaussian">Gaussian Matrix</option>
+                        <option value="sobelEdge">Edge Detection (Sobel)</option>
                     </select>
+
+                    <!-- Dynamic parameters container -->
+                    <div id="operationParams" class="operation-params" style="margin-top: 15px;">
+                        <!-- Parameters will be inserted here dynamically -->
+                    </div>
 
                     <div class="encryption-input">
                         <label for="encryptionKey">Encryption Key:</label>

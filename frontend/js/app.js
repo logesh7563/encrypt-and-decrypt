@@ -2,6 +2,74 @@
 let originalImageData = null;
 let processedImageData = null;
 
+// Operation parameters configuration
+const operationParams = {
+    rotate: {
+        angle: { type: 'range', min: 0, max: 360, default: 45, label: 'Rotation Angle (degrees)' }
+    },
+    shearRotate: {
+        angle: { type: 'range', min: 0, max: 360, default: 45, label: 'Rotation Angle (degrees)' }
+    },
+    boxBlur: {
+        kernelSize: { type: 'range', min: 3, max: 19, step: 2, default: 3, label: 'Kernel Size' }
+    },
+    gaussian: {
+        sigma: { type: 'range', min: 0.1, max: 10, step: 0.1, default: 1.5, label: 'Sigma' },
+        kernelSize: { type: 'range', min: 3, max: 19, step: 2, default: 3, label: 'Kernel Size' }
+    },
+    sobelEdge: {
+        threshold: { type: 'range', min: 0, max: 255, default: 128, label: 'Threshold' }
+    }
+};
+
+// Function to update operation parameters UI
+function updateOperationParams() {
+    const operation = document.getElementById('operationSelect').value;
+    const paramsContainer = document.getElementById('operationParams');
+    
+    // Clear existing parameters
+    paramsContainer.innerHTML = '';
+    
+    // If operation has parameters, create UI for them
+    if (operationParams[operation]) {
+        Object.entries(operationParams[operation]).forEach(([paramName, config]) => {
+            const paramGroup = document.createElement('div');
+            paramGroup.className = 'param-group';
+            
+            const label = document.createElement('label');
+            label.htmlFor = `param_${paramName}`;
+            label.textContent = config.label;
+            paramGroup.appendChild(label);
+            
+            const input = document.createElement('input');
+            input.type = config.type;
+            input.id = `param_${paramName}`;
+            input.min = config.min;
+            input.max = config.max;
+            input.step = config.step || 1;
+            input.value = config.default;
+            
+            // Add value display for range inputs
+            if (config.type === 'range') {
+                const valueDisplay = document.createElement('div');
+                valueDisplay.className = 'param-value';
+                valueDisplay.textContent = config.default + (paramName === 'angle' ? '°' : '');
+                
+                input.oninput = () => {
+                    valueDisplay.textContent = input.value + (paramName === 'angle' ? '°' : '');
+                };
+                
+                paramGroup.appendChild(input);
+                paramGroup.appendChild(valueDisplay);
+            } else {
+                paramGroup.appendChild(input);
+            }
+            
+            paramsContainer.appendChild(paramGroup);
+        });
+    }
+}
+
 /**
  * Handles image upload from the file input
  */
@@ -124,48 +192,58 @@ async function processImage(imageData, operation) {
             canvas.width = img.width;
             canvas.height = img.height;
             
+            // Get operation parameters
+            const params = {};
+            if (operationParams[operation]) {
+                Object.keys(operationParams[operation]).forEach(paramName => {
+                    const input = document.getElementById(`param_${paramName}`);
+                    if (input) {
+                        params[paramName] = parseFloat(input.value);
+                    }
+                });
+            }
+            
             // Apply the selected operation
             switch (operation) {
                 case 'flip':
+                    // Upside down - flip vertically
                     ctx.translate(0, canvas.height);
                     ctx.scale(1, -1);
                     break;
                     
                 case 'rotate':
+                    // Rotate by angle
                     ctx.translate(canvas.width/2, canvas.height/2);
-                    ctx.rotate(Math.PI/2); // 90 degrees
-                    ctx.translate(-canvas.height/2, -canvas.width/2);
-                    canvas.width = img.height;
-                    canvas.height = img.width;
+                    ctx.rotate((params.angle || 45) * Math.PI / 180);
+                    ctx.translate(-canvas.width/2, -canvas.height/2);
+                    break;
+
+                case 'shearRotate':
+                    // Three shear matrix rotation - will be implemented server-side
+                    ctx.translate(canvas.width/2, canvas.height/2);
+                    ctx.rotate((params.angle || 45) * Math.PI / 180);
+                    ctx.translate(-canvas.width/2, -canvas.height/2);
                     break;
                     
                 case 'grayscale':
                     ctx.filter = 'grayscale(100%)';
                     break;
                     
-                case 'blur':
-                    ctx.filter = 'blur(5px)';
+                case 'boxBlur':
+                    ctx.filter = `blur(${params.kernelSize || 3}px)`;
                     break;
 
-                case 'invert':
-                    ctx.filter = 'invert(100%)';
+                case 'gaussian':
+                    ctx.filter = `blur(${params.sigma || 1.5}px)`;
                     break;
 
-                case 'sepia':
-                    ctx.filter = 'sepia(100%)';
-                    break;
-
-                case 'contrast':
-                    ctx.filter = 'contrast(200%)';
+                case 'sobelEdge':
+                    ctx.filter = `grayscale(100%) contrast(${params.threshold || 128}%)`;
                     break;
             }
             
             // Draw image with the applied filters/transformations
-            if (operation === 'rotate') {
-                ctx.drawImage(img, 0, 0, img.height, img.width);
-            } else {
-                ctx.drawImage(img, 0, 0, img.width, img.height);
-            }
+            ctx.drawImage(img, 0, 0, img.width, img.height);
             
             // Reset filters
             ctx.filter = 'none';
@@ -488,5 +566,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 serverOptions.style.display = this.value === 'server' ? 'block' : 'none';
             }
         });
+    }
+
+    // Add event listener for operation select change
+    const operationSelect = document.getElementById('operationSelect');
+    if (operationSelect) {
+        operationSelect.addEventListener('change', updateOperationParams);
+        // Initialize parameters for default selection
+        updateOperationParams();
     }
 });
