@@ -19,7 +19,7 @@ import (
 
 const (
 	// HTTPPort is the port for the HTTP server
-	HTTPPort = "8083"
+	HTTPPort = "8085"
 
 	// MaxUploadSize is the maximum size of uploaded images (10MB)
 	MaxUploadSize = 10 * 1024 * 1024
@@ -67,6 +67,7 @@ func StartServer() {
 	apiRouter.HandleFunc("/transmit", handleTransmit).Methods("POST", "OPTIONS")
 	apiRouter.HandleFunc("/decrypt", handleDecrypt).Methods("POST", "OPTIONS")
 	apiRouter.HandleFunc("/encrypt", handleEncrypt).Methods("POST", "OPTIONS")
+	apiRouter.HandleFunc("/receive", handleReceive).Methods("POST", "OPTIONS")
 
 	// Serve static files from the frontend directory
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("../frontend")))
@@ -520,6 +521,94 @@ func handleEncrypt(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(encryptedData); err != nil {
 		log.Printf("Error writing response: %v", err)
 	}
+}
+
+// handleReceive requests image data from a TCP server
+func handleReceive(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// Handle preflight requests
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		ImageID    string `json:"imageID"`
+		ServerAddr string `json:"serverAddr"`
+		Key        string `json:"key,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check required fields
+	if req.ImageID == "" || req.ServerAddr == "" {
+		sendError(w, "Image ID and server address are required", http.StatusBadRequest)
+		return
+	}
+
+	// Create a temporary file for the received image
+	tmpFile, err := os.CreateTemp(ProcessedPath, "received-*.enc")
+	if err != nil {
+		sendError(w, "Failed to create temp file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tmpFile.Close()
+
+	// Request the image from the TCP server
+	err = RequestImageViaTCP(req.ImageID, req.ServerAddr, tmpFile.Name())
+	if err != nil {
+		sendError(w, "Failed to retrieve image: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// If a key was provided, decrypt the image
+	if req.Key != "" {
+		// Read the encrypted data
+		encryptedData, err := os.ReadFile(tmpFile.Name())
+		if err != nil {
+			sendError(w, "Failed to read encrypted data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Decrypt the data
+		decryptedData, err := DecryptData(encryptedData, req.Key)
+		if err != nil {
+			sendError(w, "Failed to decrypt data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Save the decrypted data to a new file
+		decryptedFile := strings.TrimSuffix(tmpFile.Name(), ".enc") + ".jpg"
+		if err := os.WriteFile(decryptedFile, decryptedData, 0644); err != nil {
+			sendError(w, "Failed to save decrypted image: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Return the path to the decrypted file
+		basename := filepath.Base(decryptedFile)
+		sendJSON(w, ImageResponse{
+			Success: true,
+			Message: "Image received and decrypted successfully",
+			Data:    basename,
+		})
+		return
+	}
+
+	// Return the path to the encrypted file
+	basename := filepath.Base(tmpFile.Name())
+	sendJSON(w, ImageResponse{
+		Success: true,
+		Message: "Image received successfully",
+		Data:    basename,
+	})
 }
 
 // Helper function to check if a string is base64 encoded

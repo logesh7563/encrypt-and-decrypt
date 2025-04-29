@@ -3,159 +3,594 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Image Processing</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Welcome - Secure Image Processing</title>
     <style>
+        :root {
+            --primary: #4CAF50;      /* Green */
+            --primary-dark: #3e8e41;
+            --primary-light: #81c784;
+            --accent: #8e24aa;       /* Purple accent */
+            --accent-light: #b39ddb;
+            --bg-dark: #121212;
+            --bg-card: #1E1E1E;
+            --bg-card-hover: #2A2A2A;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+            --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 6px 15px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
         body {
-            background-color: #1a1a1a;
-            color: #ffffff;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
             font-family: 'Segoe UI', Arial, sans-serif;
-        }
-
-        header {
-            background-color: #2d2d2d;
-            padding: 2rem;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-
-        header h1 {
-            color: #4CAF50;
             margin: 0;
-            font-size: 2.5rem;
-        }
-
-        header p {
-            color: #888;
-            margin-top: 0.5rem;
-        }
-
-        .mode-selection {
-            text-align: center;
-            padding: 50px 20px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .mode-cards {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 30px;
-            flex-wrap: wrap;
-            gap: 2rem;
-        }
-
-        .mode-card {
-            background-color: #2d2d2d;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            padding: 30px;
-            margin: 10px;
-            width: 300px;
-            text-align: center;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            border: 1px solid #3d3d3d;
-        }
-
-        .mode-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.2);
-            border-color: #4CAF50;
-        }
-
-        .mode-card h3 {
-            margin-top: 0;
-            color: #4CAF50;
-            font-size: 1.5rem;
-        }
-
-        .mode-card p {
-            color: #888;
-            margin-bottom: 25px;
+            padding: 0;
             line-height: 1.6;
+            overflow-x: hidden;
         }
 
-        .mode-card img {
-            width: 80px;
-            height: 80px;
+        .hero {
+            background: linear-gradient(135deg, #1E1E1E 0%, #121212 100%);
+            padding: 120px 0 80px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://cdn.pixabay.com/photo/2018/01/17/20/22/analytics-3088958_1280.jpg') center/cover;
+            opacity: 0.08;
+            z-index: 0;
+            filter: contrast(1.2) saturate(0.8);
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 20px;
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        .hero-badge {
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            animation: fadeInUp 1s ease 0.1s forwards;
+        }
+
+        h1 {
+            color: var(--primary);
+            font-size: 4rem;
             margin-bottom: 20px;
-            filter: invert(1) hue-rotate(180deg);
-            opacity: 0.9;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            animation: fadeInUp 1s ease 0.2s forwards;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: fadeInUp 1s ease 0.4s forwards;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-buttons {
+            opacity: 0;
+            animation: fadeInUp 1s ease 0.6s forwards;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary);
+            color: white;
+            padding: 15px 32px;
+            height: 56px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            font-size: 1.1rem;
+            min-width: 180px;
+        }
+
+        .cta-button.secondary {
+            background-color: transparent;
+            border: 2px solid var(--accent);
+            color: var(--accent);
+            box-shadow: none;
+        }
+
+        .cta-button.secondary:hover {
+            background-color: var(--accent);
+            color: white;
+            transform: translateY(-3px);
+            box-shadow: 0 7px 20px rgba(142, 36, 170, 0.3);
+        }
+
+        .cta-button:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: 0.5s;
+            z-index: -1;
+        }
+
+        .cta-button:hover {
+            background-color: var(--primary-dark);
+            box-shadow: 0 7px 20px rgba(76, 175, 80, 0.5);
+            transform: translateY(-3px);
+        }
+
+        .cta-button:hover:before {
+            left: 100%;
+        }
+
+        .features {
+            padding: 120px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .features::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 100px;
+            background: linear-gradient(to bottom, var(--primary), transparent);
+        }
+
+        .section-title {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.5rem;
+            margin-bottom: 70px;
+            position: relative;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .section-visible .section-title {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .section-title:after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 1.2s ease 0.3s;
+        }
+
+        .section-visible .section-title:after {
+            width: 80px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+        }
+
+        .feature-card {
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            padding: 40px 30px;
+            box-shadow: var(--shadow-md);
+            transition: transform 0.5s ease, box-shadow 0.5s ease, opacity 0.5s ease;
+            border: 1px solid #333;
+            opacity: 0;
+            transform: translateY(40px);
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 0;
+            background: linear-gradient(to bottom, var(--primary), var(--accent));
+            transition: height 0.5s ease;
+        }
+
+        .feature-card:hover::before {
+            height: 100%;
+        }
+
+        .feature-card:nth-child(1) {
+            transition-delay: 0.1s;
+        }
+
+        .feature-card:nth-child(2) {
+            transition-delay: 0.3s;
+        }
+
+        .feature-card:nth-child(3) {
+            transition-delay: 0.5s;
+        }
+
+        .section-visible .feature-card {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-lg);
+            background-color: var(--bg-card-hover);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 25px;
+            background: rgba(76, 175, 80, 0.1);
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed rgba(76, 175, 80, 0.3);
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+
+        .feature-card:hover .feature-icon {
+            transform: scale(1.1);
+            background: rgba(76, 175, 80, 0.2);
+        }
+
+        .feature-title {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            transition: color 0.3s ease;
+        }
+
+        .feature-card:hover .feature-title {
+            color: var(--primary-light);
+        }
+
+        .feature-desc {
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        .security {
+            padding: 120px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: rgba(30, 30, 30, 0.5);
+            border-radius: 20px;
+        }
+
+        .security-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+        }
+
+        .security-card {
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: var(--shadow-md);
+            opacity: 0;
+            transform: translateY(40px);
+            transition: opacity 0.5s ease, transform 0.5s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .security-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, transparent 50%, rgba(76, 175, 80, 0.1) 50%);
+            z-index: -1;
+            transition: transform 0.5s ease;
+        }
+
+        .security-card:hover::after {
+            transform: scale(1.5);
+        }
+
+        .security-card:nth-child(1) {
+            transition-delay: 0.1s;
+        }
+
+        .security-card:nth-child(2) {
+            transition-delay: 0.3s;
+        }
+
+        .security-card:nth-child(3) {
+            transition-delay: 0.5s;
+        }
+
+        .section-visible .security-card {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .security-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-5px);
+        }
+
+        .security-title {
+            color: var(--primary);
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .security-icon {
+            margin-right: 15px;
+            background: rgba(76, 175, 80, 0.1);
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: transform 0.3s ease;
         }
 
-        .mode-card:hover img {
-            transform: scale(1.1);
+        .security-card:hover .security-icon {
+            transform: rotateY(180deg);
         }
 
-        .mode-btn {
-            display: inline-block;
-            background-color: #4CAF50;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-        }
-
-        .mode-btn:hover {
-            background-color: #45a049;
-            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
-            transform: translateY(-2px);
+        .security-title span {
+            margin-left: 10px;
         }
 
         footer {
-            background-color: #2d2d2d;
-            color: #888;
+            background-color: rgba(30, 30, 30, 0.9);
+            color: var(--text-secondary);
             text-align: center;
-            padding: 1rem;
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+            padding: 40px 0;
+            margin-top: 50px;
+            position: relative;
         }
 
+        footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+        }
+
+        /* Scroll Animation Keyframes */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Scroll Progress Bar */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+            width: 100%;
+            height: 4px;
+            background: transparent;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            width: 0%;
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            transition: width 0.1s ease;
+        }
+
+        /* Responsive Styles */
         @media (max-width: 768px) {
-            .mode-cards {
-                flex-direction: column;
-                align-items: center;
+            h1 {
+                font-size: 2.5rem;
             }
 
-            .mode-card {
-                width: 90%;
-                max-width: 300px;
+            .subtitle {
+                font-size: 1.2rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .section-title {
+                font-size: 2rem;
             }
         }
     </style>
 </head>
 <body>
-    <header>
-        <h1>Secure Image Processing and Transmission</h1>
-        <p>Choose your operation mode</p>
-    </header>
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
 
-    <div class="mode-selection">
-        <div class="mode-cards">
-            <div class="mode-card">
-                <img src="https://cdn-icons-png.flaticon.com/512/1027/1027532.png" alt="Encrypt Icon">
-                <h3>Encryption Mode</h3>
-                <p>Upload, process, and encrypt your images securely. This mode allows you to apply various image processing operations before encrypting.</p>
-                <a href="encrypt.html" class="mode-btn">Go to Encryption</a>
-            </div>
-            
-            <div class="mode-card">
-                <img src="https://cdn-icons-png.flaticon.com/512/1027/1027538.png" alt="Decrypt Icon">
-                <h3>Decryption Mode</h3>
-                <p>Upload encrypted images and decrypt them using your secret key. View and download the original processed images.</p>
-                <a href="decrypt.html" class="mode-btn">Go to Decryption</a>
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">Advanced Security</div>
+            <h1>Secure Image Processing and Transmission</h1>
+            <div class="subtitle">A comprehensive solution for encrypting, processing, and securely transmitting digital images with end-to-end protection</div>
+            <div class="cta-buttons">
+                <a href="home.html" class="cta-button">Get Started</a>
+                <a href="#features" class="cta-button secondary">Learn More</a>
             </div>
         </div>
-    </div>
-    
+    </section>
+
+    <section class="features" id="features">
+        <h2 class="section-title">Key Features</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3 class="feature-title">Advanced Encryption</h3>
+                <p class="feature-desc">Use state-of-the-art encryption algorithms to protect your images from unauthorized access. Our encryption process ensures that only those with the correct key can view the original content.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🖼️</div>
+                <h3 class="feature-title">Image Processing</h3>
+                <p class="feature-desc">Apply various transformations and effects to your images before encrypting them. Options include rotation, grayscale conversion, flipping, and Gaussian blur for complete workflow integration.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📡</div>
+                <h3 class="feature-title">Secure Transmission</h3>
+                <p class="feature-desc">Transmit your encrypted images across networks with confidence. Our application ensures that your data remains protected throughout the entire transmission process with minimal overhead.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="security" id="securitySection">
+        <h2 class="section-title">Security Features</h2>
+        <div class="security-cards">
+            <div class="security-card">
+                <div class="security-title">
+                    <div class="security-icon">🔐</div>
+                    <span>End-to-End Encryption</span>
+                </div>
+                <p>Your images are encrypted from the moment they're processed and remain encrypted until you choose to decrypt them, ensuring complete privacy throughout the entire process.</p>
+            </div>
+            <div class="security-card">
+                <div class="security-title">
+                    <div class="security-icon">🔑</div>
+                    <span>User-controlled Keys</span>
+                </div>
+                <p>You maintain complete control over your encryption keys, ensuring that only you can access your encrypted data. No third parties, not even our servers, can access your keys.</p>
+            </div>
+            <div class="security-card">
+                <div class="security-title">
+                    <div class="security-icon">🛡️</div>
+                    <span>No Server Storage</span>
+                </div>
+                <p>Your images and keys are never stored on our servers, eliminating the risk of data breaches. All processing happens locally on your device for maximum security.</p>
+            </div>
+        </div>
+    </section>
+
     <footer>
         <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
     </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+        
+        // Scroll animation for sections
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize scroll observer
+            const sections = document.querySelectorAll('.features, .security');
+            
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.25
+            };
+
+            const observer = new IntersectionObserver(function(entries, observer) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('section-visible');
+                    }
+                });
+            }, observerOptions);
+
+            sections.forEach(section => {
+                observer.observe(section);
+            });
+
+            // Progress bar
+            window.onscroll = function() {updateProgressBar()};
+
+            function updateProgressBar() {
+                const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+                const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+                const scrolled = (winScroll / height) * 100;
+                document.getElementById("progressBar").style.width = scrolled + "%";
+            }
+        });
+    </script>
 </body>
-</html>
+</html> 

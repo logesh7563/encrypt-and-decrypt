@@ -52,17 +52,31 @@ func StartTCPServer() {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	// Read image data
-	buffer := make([]byte, 1024*1024) // 1MB buffer
-	n, err := conn.Read(buffer)
-	if err != nil {
-		log.Println("Failed to read data:", err)
+	log.Printf("New connection from %s", conn.RemoteAddr().String())
+
+	// Set a reasonable timeout
+	conn.SetDeadline(time.Now().Add(1 * time.Minute))
+
+	// Read message type first
+	msgTypeBuf := make([]byte, 1)
+	if _, err := io.ReadFull(conn, msgTypeBuf); err != nil {
+		log.Println("Failed to read message type:", err)
 		return
 	}
 
-	// Process received data
-	data := buffer[:n]
-	log.Printf("Received %d bytes of data", len(data))
+	// Handle the message based on its type
+	switch msgTypeBuf[0] {
+	case ImageDataRequest:
+		log.Printf("Received image request from %s", conn.RemoteAddr().String())
+		handleImageRequest(conn)
+
+	case ImageDataTransfer:
+		log.Printf("Received image transfer from %s", conn.RemoteAddr().String())
+		handleImageTransfer(conn)
+
+	default:
+		log.Printf("Unknown message type %d from %s", msgTypeBuf[0], conn.RemoteAddr().String())
+	}
 }
 
 // handleImageRequest sends requested encrypted image back to client
@@ -172,9 +186,42 @@ func SendImageViaTCP(imageID string, encryptedData []byte, serverAddr string) er
 	}
 	defer conn.Close()
 
-	// Send image data
-	_, err = conn.Write(encryptedData)
-	return err
+	// Create buffer for the complete message
+	var buf bytes.Buffer
+
+	// Add message type
+	buf.WriteByte(ImageDataTransfer)
+
+	// Add image ID length and ID
+	idBytes := []byte(imageID)
+	idLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(idLenBytes, uint32(len(idBytes)))
+	buf.Write(idLenBytes)
+	buf.Write(idBytes)
+
+	// Add data size and data
+	sizeBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(sizeBytes, uint32(len(encryptedData)))
+	buf.Write(sizeBytes)
+	buf.Write(encryptedData)
+
+	// Send the complete message
+	_, err = conn.Write(buf.Bytes())
+	if err != nil {
+		return err
+	}
+
+	// Wait for confirmation
+	confirmBuf := make([]byte, 1)
+	if _, err := io.ReadFull(conn, confirmBuf); err != nil {
+		return err
+	}
+
+	if confirmBuf[0] != ConfirmationMessage {
+		return err
+	}
+
+	return nil
 }
 
 // RequestImageViaTCP requests and receives an encrypted image from a TCP server

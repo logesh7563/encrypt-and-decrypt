@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Image Processing - Home</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        :root {
+            --primary: #4CAF50;      /* Green */
+            --primary-dark: #3e8e41;
+            --primary-light: #81c784;
+            --accent: #8e24aa;       /* Purple accent */
+            --accent-light: #b39ddb;
+            --bg-dark: #121212;
+            --bg-card: #1E1E1E;
+            --bg-card-hover: #2A2A2A;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+            --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 6px 15px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background-color: var(--bg-card);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://cdn.pixabay.com/photo/2018/01/17/20/22/analytics-3088958_1280.jpg') center/cover;
+            opacity: 0.05;
+            z-index: 0;
+        }
+
+        header h1 {
+            color: var(--primary);
+            margin: 0;
+            font-size: 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        nav {
+            margin-top: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            display: inline-block;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link:hover {
+            background-color: rgba(76, 175, 80, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(76, 175, 80, 0.2), rgba(142, 36, 170, 0.1));
+            font-weight: 600;
+        }
+
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        /* Hero section */
+        .hero {
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            margin: 30px 0;
+            padding: 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://cdn.pixabay.com/photo/2018/01/17/20/22/analytics-3088958_1280.jpg') center/cover;
+            opacity: 0.05;
+            z-index: 0;
+            filter: contrast(1.2) saturate(0.8);
+        }
+
+        .hero h2 {
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 30px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            color: var(--text-secondary);
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
+            box-shadow: var(--shadow-sm);
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin: 0 10px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .cta-button.outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .cta-button.outline:hover {
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        /* Features section */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin: 50px 0;
+        }
+
+        .feature-card {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            border-color: rgba(76, 175, 80, 0.2);
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .feature-card h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+        }
+
+        /* How it works section */
+        .how-it-works {
+            margin: 60px 0;
+            text-align: center;
+        }
+
+        .how-it-works h2 {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-bottom: 50px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .how-it-works h2::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        .steps {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            position: relative;
+            padding: 0 20px;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 40px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: rgba(255, 255, 255, 0.1);
+            z-index: 0;
+        }
+
+        .step {
+            flex: 1;
+            position: relative;
+            z-index: 1;
+            padding: 0 15px;
+            max-width: 250px;
+        }
+
+        .step-number {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0 auto 20px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .step h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .step p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* CTA section */
+        .cta-section {
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            padding: 60px;
+            margin: 50px 0;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://cdn.pixabay.com/photo/2018/01/17/20/22/analytics-3088958_1280.jpg') center/cover;
+            opacity: 0.05;
+            z-index: 0;
+            filter: contrast(1.2) saturate(0.8);
+        }
+
+        .cta-section h2 {
+            color: var(--primary);
+            font-size: 2rem;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cta-section p {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--bg-card);
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 20px;
+            margin-top: 50px;
+        }
+
+        /* Media queries */
+        @media (max-width: 768px) {
+            .hero {
+                padding: 40px 20px;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+            
+            .steps {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .steps::before {
+                display: none;
+            }
+            
+            .step {
+                margin-bottom: 40px;
+            }
+            
+            .cta-section {
+                padding: 40px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Secure Image Processing and Transmission</h1>
+        <nav>
+            <a href="home.html" class="nav-link active">Home</a>
+            <a href="encrypt.html" class="nav-link">Encrypt</a>
+            <a href="decrypt.html" class="nav-link">Decrypt</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <section class="hero">
+            <h2>Secure Your Visual Data with Advanced Encryption</h2>
+            <p>Our platform provides robust image encryption and decryption capabilities, ensuring your visual data remains secure during transmission and storage. Built with modern encryption algorithms and easy-to-use interfaces.</p>
+            <div>
+                <a href="encrypt.html" class="cta-button">Start Encrypting</a>
+                <a href="decrypt.html" class="cta-button outline">Decrypt Images</a>
+            </div>
+        </section>
+
+        <section class="features">
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Strong Encryption</h3>
+                <p>State-of-the-art AES-256 encryption algorithm ensures your images remain private and secure from unauthorized access.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Fast Processing</h3>
+                <p>Optimized algorithms process your images quickly, maintaining quality while applying strong encryption.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3>Secure Transmission</h3>
+                <p>Safely transmit encrypted images through our secure server-to-server communication protocol.</p>
+            </div>
+        </section>
+
+        <section class="how-it-works">
+            <h2>How It Works</h2>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Upload</h3>
+                    <p>Select and upload the image you want to encrypt or the encrypted file you want to decrypt.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Process</h3>
+                    <p>Our system encrypts your image with your provided key or decrypts it using your decryption key.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Save or Send</h3>
+                    <p>Download your encrypted or decrypted image, or send it securely to another server.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <h2>Ready to Secure Your Images?</h2>
+            <p>Start using our encryption service today and ensure your visual data remains confidential and protected. Our easy-to-use interface allows you to quickly encrypt and decrypt images with minimal effort.</p>
+            <a href="encrypt.html" class="cta-button">Get Started Now</a>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
+    </footer>
+</body>
+</html>

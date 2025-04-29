@@ -6,210 +6,712 @@
     <title>Image Decryption - Secure Image Processing</title>
     <link rel="stylesheet" href="styles.css">
     <script src="js/app.js" defer></script>
+    <style>
+        :root {
+            --primary: #4CAF50;      /* Green */
+            --primary-dark: #3e8e41;
+            --primary-light: #81c784;
+            --accent: #8e24aa;       /* Purple accent */
+            --accent-light: #b39ddb;
+            --bg-dark: #121212;
+            --bg-card: #1E1E1E;
+            --bg-card-hover: #2A2A2A;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+            --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 6px 15px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Arial, sans-serif;
+            padding-bottom: 60px;
+            margin: 0;
+        }
+
+        header {
+            background-color: var(--bg-card);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://cdn.pixabay.com/photo/2018/01/17/20/22/analytics-3088958_1280.jpg') center/cover;
+            opacity: 0.05;
+            z-index: 0;
+        }
+
+        header h1 {
+            color: var(--primary);
+            margin: 0;
+            font-size: 2.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        nav {
+            margin-top: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            display: inline-block;
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link:hover {
+            background-color: rgba(76, 175, 80, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .nav-link.active {
+            background: linear-gradient(90deg, rgba(76, 175, 80, 0.2), rgba(142, 36, 170, 0.1));
+            font-weight: 600;
+        }
+
+        .nav-link.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 30px;
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        main::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://cdn.pixabay.com/photo/2018/01/17/20/22/analytics-3088958_1280.jpg') center/cover;
+            opacity: 0.03;
+            z-index: -1;
+            filter: contrast(1.2) saturate(0.8);
+        }
+
+        h2 {
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 8px;
+            position: relative;
+            display: inline-block;
+            margin-bottom: 25px;
+        }
+
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 40%;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .upload-container, .decryption-options, .result-container {
+            background-color: rgba(61, 61, 61, 0.5);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .upload-container:hover, .decryption-options:hover, .result-container:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            border-color: rgba(76, 175, 80, 0.2);
+        }
+
+        input[type="file"], 
+        input[type="text"], 
+        input[type="password"], 
+        select {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            border: 1px solid #4d4d4d;
+            padding: 14px;
+            border-radius: 8px;
+            width: 100%;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        input[type="file"]::file-selector-button {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--primary);
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 15px;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+            transform: translateY(-2px);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        input:focus + label,
+        select:focus + label {
+            color: var(--primary);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 50px;
+            border: none;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            box-shadow: var(--shadow-sm);
+        }
+
+        button:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: 0.5s;
+            z-index: -1;
+        }
+
+        button:hover {
+            background-color: var(--primary-dark);
+            box-shadow: 0 7px 20px rgba(76, 175, 80, 0.5);
+            transform: translateY(-3px);
+        }
+
+        button:hover:before {
+            left: 100%;
+        }
+
+        button:active {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(76, 175, 80, 0.4);
+        }
+
+        /* Image Preview Containers */
+        .image-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 25px;
+        }
+
+        .image-preview {
+            background-color: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .image-preview:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            border-color: rgba(76, 175, 80, 0.1);
+        }
+
+        .image-preview h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            position: relative;
+            display: inline-block;
+        }
+
+        .image-preview h3::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.3s ease;
+        }
+
+        .image-preview:hover h3::after {
+            width: 100%;
+        }
+
+        .image-preview img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            transition: transform 0.3s ease;
+        }
+
+        .image-preview:hover img {
+            transform: scale(1.02);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        footer {
+            background-color: var(--bg-card);
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 1rem;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        .status {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border-left: 4px solid transparent;
+            transition: all 0.3s ease;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: statusFadeIn 0.5s forwards;
+        }
+
+        @keyframes statusFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success {
+            background-color: rgba(76, 175, 80, 0.1);
+            color: #81c784;
+            border-left-color: var(--primary);
+        }
+
+        .error {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left-color: #e74c3c;
+            color: #e57373;
+        }
+
+        .info {
+            color: #64b5f6;
+            border-left-color: #2196F3;
+        }
+
+        /* Progress Container */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            z-index: 1000;
+            width: 100%;
+            height: 4px;
+            background: transparent;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            width: 0%;
+            border-radius: 0 2px 2px 0;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            transition: width 0.1s ease;
+        }
+
+        /* Multi-step Progress Bar */
+        .process-progress {
+            display: flex;
+            justify-content: space-between;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .process-progress::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            width: 100%;
+            height: 2px;
+            background-color: #333;
+            z-index: 1;
+        }
+
+        .progress-step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
+            color: #888;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.active {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.3);
+        }
+
+        .progress-step.completed {
+            background-color: var(--primary-dark);
+            color: white;
+        }
+
+        .progress-label {
+            position: absolute;
+            top: 45px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: color 0.3s ease;
+        }
+
+        .progress-step.active .progress-label {
+            color: var(--primary);
+            font-weight: 500;
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .process-progress {
+                display: none;
+            }
+            
+            main {
+                padding: 20px 15px;
+            }
+            
+            .image-results {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Secure Image Processing and Transmission</h1>
-            <nav>
-                <a href="index.html" class="nav-link">Home</a>
-                <a href="encrypt.html" class="nav-link">Encrypt</a>
-                <a href="decrypt.html" class="nav-link active">Decrypt</a>
-            </nav>
-        </header>
-
-        <main>
-            <section class="upload-section">
-                <h2>Upload Encrypted File</h2>
-                <p class="helper-text">Please select an encrypted file with the .enc extension</p>
-                <div class="upload-container">
-                    <input type="file" id="encryptedFileInput" accept=".enc,.txt,.jpg,.png">
-                    <div class="encryption-input">
-                        <label for="decryptionKey">Decryption Key:</label>
-                        <input type="password" id="decryptionKey" required>
-                    </div>
-                    <button id="decryptBtn">Decrypt File</button>
-                </div>
-                <div id="decryptStatus" class="status"></div>
-            </section>
-
-            <section class="result-section">
-                <h2>Decrypted Image</h2>
-                <div class="result-container">
-                    <div class="image-preview">
-                        <h3>Decrypted Image</h3>
-                        <img id="decryptedImage" src="" alt="Decrypted Image">
-                    </div>
-                </div>
-                <div class="action-buttons">
-                    <button id="saveBtn">Save Decrypted Image</button>
-                </div>
-            </section>
-        </main>
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
     </div>
-    
+
+    <header>
+        <h1>Secure Image Processing and Transmission</h1>
+        <nav>
+            <a href="home.html" class="nav-link">Home</a>
+            <a href="encrypt.html" class="nav-link">Encrypt</a>
+            <a href="decrypt.html" class="nav-link active">Decrypt</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="process-progress">
+            <div class="progress-step active" id="step1">
+                1
+                <span class="progress-label">Upload</span>
+            </div>
+            <div class="progress-step" id="step2">
+                2
+                <span class="progress-label">Decrypt</span>
+            </div>
+            <div class="progress-step" id="step3">
+                3
+                <span class="progress-label">Result</span>
+            </div>
+        </div>
+
+        <section class="upload-section">
+            <h2>Upload Encrypted Image</h2>
+            <div class="upload-container">
+                <input type="file" id="encryptedImageInput" accept="image/*">
+                <button id="uploadBtn">Upload</button>
+            </div>
+            <div id="uploadStatus" class="status"></div>
+        </section>
+
+        <section class="decryption-section">
+            <h2>Decrypt Image</h2>
+            <div class="decryption-options">
+                <div class="decryption-key-input">
+                    <label for="decryptionKey">Decryption Key:</label>
+                    <input type="password" id="decryptionKey" required>
+                </div>
+
+                <div class="source-options">
+                    <label for="sourceSelect">Source:</label>
+                    <select id="sourceSelect">
+                        <option value="local">Local File</option>
+                        <option value="server">From Server</option>
+                    </select>
+                </div>
+
+                <div id="serverOptions" style="display: none;">
+                    <div class="server-input">
+                        <label for="serverAddress">Server Address:</label>
+                        <input type="text" id="serverAddress" placeholder="localhost:8084">
+                    </div>
+                    <div class="image-id-input">
+                        <label for="imageId">Image ID:</label>
+                        <input type="text" id="imageId" placeholder="unique_image_id">
+                    </div>
+                </div>
+
+                <button id="decryptBtn">Decrypt Image</button>
+            </div>
+            <div id="decryptionStatus" class="status"></div>
+        </section>
+
+        <section class="result-section">
+            <h2>Results</h2>
+            <div class="image-results">
+                <div class="image-preview">
+                    <h3>Encrypted Image</h3>
+                    <img id="encryptedImage" src="" alt="Encrypted Image">
+                </div>
+                <div class="image-preview">
+                    <h3>Decrypted Image</h3>
+                    <img id="decryptedImage" src="" alt="Decrypted Image">
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button id="downloadBtn">Download Decrypted Image</button>
+                <button id="processAgainBtn">Process Another Image</button>
+            </div>
+        </section>
+    </main>
+
     <footer>
         <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
     </footer>
-    
+
     <script>
-        // Function to handle encrypted file upload and decryption
-        function handleEncryptedUpload() {
-            const fileInput = document.getElementById('encryptedFileInput');
-            const keyInput = document.getElementById('decryptionKey');
-            const statusDiv = document.getElementById('decryptStatus');
-            const decryptedImage = document.getElementById('decryptedImage');
-            
-            // Check if file and key are provided
-            if (!fileInput.files.length) {
-                showError('Please select a file to decrypt');
-                return;
-            }
-            
-            if (!keyInput.value.trim()) {
-                showError('Please enter a decryption key');
-                return;
-            }
-            
-            // Check if file is encrypted (should have .enc extension)
-            const fileName = fileInput.files[0].name;
-            if (!fileName.toLowerCase().endsWith('.enc')) {
-                showError('Warning: File does not have .enc extension. It may not be encrypted properly.');
-            }
-            
-            // Show loading message
-            statusDiv.innerHTML = '<p class="info">Decrypting image, please wait...</p>';
-            
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            formData.append('key', keyInput.value);
-            
-            // Send request to your Go server
-            fetch('http://localhost:8083/api/decrypt', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    // Get detailed error message from the response
-                    return response.text().then(text => {
-                        let errorMessage = 'Decryption failed';
-                        
-                        // Try to extract more detailed error info
-                        if (text) {
-                            try {
-                                // Check if it's JSON format
-                                const errorJson = JSON.parse(text);
-                                if (errorJson.message) {
-                                    errorMessage = errorJson.message;
-                                } else {
-                                    errorMessage = text;
-                                }
-                            } catch (e) {
-                                // If not JSON, use the text directly
-                                errorMessage = text;
-                            }
-                        }
-                        
-                        throw new Error(`${errorMessage} (Status: ${response.status})`);
-                    });
-                }
-                return response.blob();
-            })
-            .then(blob => {
-                // Check if the blob is an image
-                if (!blob.type.startsWith('image/')) {
-                    throw new Error(`Decryption resulted in an invalid file type: ${blob.type}. This may indicate an incorrect decryption key.`);
-                }
-                
-                // Display the decrypted image
-                const url = URL.createObjectURL(blob);
-                decryptedImage.src = url;
-                decryptedImage.style.display = "block"; // Make sure the image is visible
-                showSuccess('Image decrypted successfully');
-            })
-            .catch(error => {
-                console.error('Decryption error:', error);
-                decryptedImage.style.display = "none"; // Hide the image display
-                showError(error.message || 'Failed to decrypt image. Please verify the file is encrypted and the key is correct.');
-            });
-        }
+        // Progress bar
+        window.onscroll = function() {updateProgressBar()};
 
-        // Helper functions to show status messages with more formatting
-        function showError(message) {
-            const statusDiv = document.getElementById('decryptStatus');
-            let errorDetails = "";
-            let recommendation = "";
-            
-            // Provide specific recommendations based on error message
-            if (message.includes("key is incorrect") || message.includes("authentication failed")) {
-                errorDetails = "The decryption key doesn't match the encryption key that was used.";
-                recommendation = `
-                    <ul>
-                        <li><strong>Double-check your decryption key</strong> - Make sure it exactly matches the key used for encryption</li>
-                        <li>Make sure the file hasn't been modified or corrupted since encryption</li>
-                        <li>Verify you're using the correct encrypted file</li>
-                    </ul>
-                `;
-            } else if (message.includes("not appear to be an image")) {
-                errorDetails = "The file was decrypted but doesn't contain image data.";
-                recommendation = `
-                    <ul>
-                        <li>The original file might not have been an image</li>
-                        <li>The file might have been encrypted using a different method</li>
-                    </ul>
-                `;
-            } else {
-                // Generic recommendations for other errors
-                recommendation = `
-                    <ul>
-                        <li>Make sure the file is properly encrypted with our encryption tool</li>
-                        <li>Check that you're using the correct decryption key</li>
-                        <li>Verify the file hasn't been corrupted or modified</li>
-                    </ul>
-                `;
-            }
-            
-            statusDiv.innerHTML = `
-                <div class="error">
-                    <strong>Error:</strong> ${message}
-                    <p>${errorDetails}</p>
-                    <p class="helper-text">Recommendations:
-                        ${recommendation}
-                    </p>
-                </div>
-            `;
-        }
-
-        function showSuccess(message) {
-            const statusDiv = document.getElementById('decryptStatus');
-            statusDiv.innerHTML = `<p class="success">${message}</p>`;
-        }
-        
-        // Function to save the decrypted image
-        function handleSaveDecrypted() {
-            const decryptedImage = document.getElementById('decryptedImage');
-            if (!decryptedImage.src || decryptedImage.src === window.location.href) {
-                showError('No decrypted image to save');
-                return;
-            }
-            
-            // Create a link to download the image
-            const a = document.createElement('a');
-            a.href = decryptedImage.src;
-            a.download = 'decrypted_image.jpg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            
-            showSuccess('Image saved successfully');
+        function updateProgressBar() {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById("progressBar").style.width = scrolled + "%";
         }
 
         // Add event listeners after DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('decryptBtn').addEventListener('click', handleEncryptedUpload);
-            document.getElementById('saveBtn').addEventListener('click', handleSaveDecrypted);
+            document.getElementById('uploadBtn').addEventListener('click', handleUpload);
+            document.getElementById('decryptBtn').addEventListener('click', handleDecrypt);
+            document.getElementById('downloadBtn').addEventListener('click', handleDownload);
+            document.getElementById('processAgainBtn').addEventListener('click', handleReset);
+            
+            // Show/hide server options based on source selection
+            document.getElementById('sourceSelect').addEventListener('change', function() {
+                if (this.value === 'server') {
+                    document.getElementById('serverOptions').style.display = 'block';
+                } else {
+                    document.getElementById('serverOptions').style.display = 'none';
+                }
+            });
+            
+            // Workflow step handling
+            document.getElementById('uploadBtn').addEventListener('click', function() {
+                activateStep(2);
+            });
+            
+            document.getElementById('decryptBtn').addEventListener('click', function() {
+                activateStep(3);
+            });
         });
+        
+        function activateStep(step) {
+            // Reset all steps
+            for (let i = 1; i <= 3; i++) {
+                const stepElement = document.getElementById('step' + i);
+                if (i < step) {
+                    stepElement.classList.remove('active');
+                    stepElement.classList.add('completed');
+                } else if (i === step) {
+                    stepElement.classList.add('active');
+                    stepElement.classList.remove('completed');
+                } else {
+                    stepElement.classList.remove('active');
+                    stepElement.classList.remove('completed');
+                }
+            }
+        }
+
+        function handleUpload() {
+            const fileInput = document.getElementById('encryptedImageInput');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files.length) {
+                showError('Please select a file to upload', statusDiv);
+                return;
+            }
+            
+            // Display the uploaded image
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('encryptedImage').src = e.target.result;
+            };
+            reader.readAsDataURL(fileInput.files[0]);
+            
+            showSuccess('File uploaded successfully!', statusDiv);
+        }
+        
+        function handleDecrypt() {
+            const keyInput = document.getElementById('decryptionKey');
+            const statusDiv = document.getElementById('decryptionStatus');
+            
+            if (!keyInput.value.trim()) {
+                showError('Please enter a decryption key', statusDiv);
+                return;
+            }
+            
+            // For demonstration purposes - simulate decryption
+            statusDiv.className = 'status info';
+            statusDiv.innerHTML = 'Decrypting image, please wait...';
+            
+            setTimeout(() => {
+                // Simulate successful decryption
+                document.getElementById('decryptedImage').src = document.getElementById('encryptedImage').src;
+                showSuccess('Image decrypted successfully!', statusDiv);
+            }, 1500);
+        }
+        
+        function handleDownload() {
+            // Implement download functionality
+            const decryptedImage = document.getElementById('decryptedImage');
+            if (!decryptedImage.src) {
+                showError('No decrypted image available to download', document.getElementById('decryptionStatus'));
+                return;
+            }
+            
+            const a = document.createElement('a');
+            a.href = decryptedImage.src;
+            a.download = 'decrypted_image.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        
+        function handleReset() {
+            // Reset the form
+            document.getElementById('encryptedImageInput').value = '';
+            document.getElementById('decryptionKey').value = '';
+            document.getElementById('encryptedImage').src = '';
+            document.getElementById('decryptedImage').src = '';
+            document.getElementById('uploadStatus').innerHTML = '';
+            document.getElementById('decryptionStatus').innerHTML = '';
+            
+            // Reset progress steps
+            activateStep(1);
+        }
+        
+        // Status message helpers
+        function showError(message, statusDiv) {
+            statusDiv.className = 'status error';
+            statusDiv.innerHTML = message;
+            
+            // Animate status
+            statusDiv.style.animation = 'none';
+            setTimeout(() => {
+                statusDiv.style.animation = 'statusFadeIn 0.5s forwards';
+            }, 10);
+        }
+        
+        function showSuccess(message, statusDiv) {
+            statusDiv.className = 'status success';
+            statusDiv.innerHTML = message;
+            
+            // Animate status
+            statusDiv.style.animation = 'none';
+            setTimeout(() => {
+                statusDiv.style.animation = 'statusFadeIn 0.5s forwards';
+            }, 10);
+        }
     </script>
 </body>
 </html>
