@@ -2,6 +2,8 @@
 
 A web-based platform for secure image processing, encryption, and transmission.
 
+ go run server.go image_processing.go encryption.go tcp_server.go
+ 
 ## Features
 
 - Upload images for processing
