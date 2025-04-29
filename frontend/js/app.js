@@ -6,8 +6,10 @@ let processedImageData = null;
  * Handles image upload from the file input
  */
 async function handleUpload() {
-    const fileInput = document.getElementById('imageInput');
+    // Try to get the file input from either encrypt or decrypt page
+    const fileInput = document.getElementById('imageInput') || document.getElementById('encryptedImageInput');
     const statusElement = document.getElementById('uploadStatus');
+    const imageElement = document.getElementById('originalImage') || document.getElementById('encryptedImage');
     
     try {
         // Check if a file was selected
@@ -22,9 +24,9 @@ async function handleUpload() {
         
         const file = fileInput.files[0];
         
-        // Verify it's an image
-        if (!file.type.startsWith('image/')) {
-            statusElement.textContent = "Please select a valid image file.";
+        // Verify it's an image or .enc file
+        if (!file.type.startsWith('image/') && !file.name.endsWith('.enc')) {
+            statusElement.textContent = "Please select a valid image or .enc file.";
             statusElement.className = "status error";
             return;
         }
@@ -44,10 +46,11 @@ async function handleUpload() {
         originalImageData = await imageLoaded;
         
         // Display the original image
-        const originalImage = document.getElementById('originalImage');
-        originalImage.src = originalImageData;
+        if (imageElement) {
+            imageElement.src = originalImageData;
+        }
         
-        statusElement.textContent = "Image uploaded successfully!";
+        statusElement.textContent = "File uploaded successfully!";
         statusElement.className = "status success";
     } catch (error) {
         console.error("Upload error:", error);
@@ -290,10 +293,188 @@ async function handleTransmit() {
     }
 }
 
+/**
+ * Handles decryption of the uploaded image
+ */
+async function handleDecrypt() {
+    const statusElement = document.getElementById('decryptionStatus');
+    const decryptionKey = document.getElementById('decryptionKey').value;
+    const sourceSelect = document.getElementById('sourceSelect');
+    
+    try {
+        if (!originalImageData) {
+            statusElement.textContent = "Please upload an image first.";
+            statusElement.className = "status error";
+            return;
+        }
+        
+        if (!decryptionKey) {
+            statusElement.textContent = "Please enter a decryption key.";
+            statusElement.className = "status error";
+            return;
+        }
+        
+        statusElement.textContent = "Decrypting image...";
+        statusElement.className = "status loading";
+        
+        // Convert base64 data URL to blob
+        const response = await fetch(originalImageData);
+        const blob = await response.blob();
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('file', blob, 'image.enc');
+        formData.append('key', decryptionKey);
+        
+        // Send to server for decryption
+        const decryptResponse = await fetch('http://localhost:8083/api/decrypt', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!decryptResponse.ok) {
+            throw new Error(`HTTP error! status: ${decryptResponse.status}`);
+        }
+        
+        // Get the decrypted image as a blob
+        const decryptedBlob = await decryptResponse.blob();
+        const decryptedUrl = URL.createObjectURL(decryptedBlob);
+        
+        // Display the decrypted image
+        const decryptedImage = document.getElementById('decryptedImage');
+        if (decryptedImage) {
+            decryptedImage.src = decryptedUrl;
+        }
+        
+        statusElement.textContent = "Image decrypted successfully!";
+        statusElement.className = "status success";
+    } catch (error) {
+        console.error("Decryption error:", error);
+        statusElement.textContent = `Decryption failed: ${error.message}`;
+        statusElement.className = "status error";
+    }
+}
+
+/**
+ * Handles download of the decrypted image
+ */
+async function handleDownloadDecrypted() {
+    const statusElement = document.getElementById('decryptionStatus');
+    const decryptedImage = document.getElementById('decryptedImage');
+    
+    try {
+        if (!decryptedImage || !decryptedImage.src) {
+            statusElement.textContent = "Please decrypt an image first.";
+            statusElement.className = "status error";
+            return;
+        }
+        
+        statusElement.textContent = "Preparing download...";
+        statusElement.className = "status loading";
+        
+        // Create a download link
+        const link = document.createElement('a');
+        link.href = decryptedImage.src;
+        link.download = 'decrypted_image.png';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        statusElement.textContent = "Image downloaded successfully!";
+        statusElement.className = "status success";
+    } catch (error) {
+        console.error("Download error:", error);
+        statusElement.textContent = `Download failed: ${error.message}`;
+        statusElement.className = "status error";
+    }
+}
+
+/**
+ * Resets the decrypt page to its initial state
+ */
+function handleReset() {
+    // Reset file input
+    const fileInput = document.getElementById('encryptedImageInput');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    // Reset decryption key
+    const decryptionKey = document.getElementById('decryptionKey');
+    if (decryptionKey) {
+        decryptionKey.value = '';
+    }
+    
+    // Reset images
+    const encryptedImage = document.getElementById('encryptedImage');
+    if (encryptedImage) {
+        encryptedImage.src = '';
+    }
+    
+    const decryptedImage = document.getElementById('decryptedImage');
+    if (decryptedImage) {
+        decryptedImage.src = '';
+    }
+    
+    // Reset status messages
+    const uploadStatus = document.getElementById('uploadStatus');
+    if (uploadStatus) {
+        uploadStatus.textContent = '';
+        uploadStatus.className = 'status';
+    }
+    
+    const decryptionStatus = document.getElementById('decryptionStatus');
+    if (decryptionStatus) {
+        decryptionStatus.textContent = '';
+        decryptionStatus.className = 'status';
+    }
+    
+    // Reset global variables
+    originalImageData = null;
+    processedImageData = null;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Encrypt page buttons
     const processBtn = document.getElementById('processBtn');
     if (processBtn) {
         processBtn.addEventListener('click', handleProcess);
     }
-    // Other event bindings...
+
+    // Decrypt page buttons
+    const uploadBtn = document.getElementById('uploadBtn');
+    if (uploadBtn) {
+        uploadBtn.addEventListener('click', handleUpload);
+    }
+
+    const decryptBtn = document.getElementById('decryptBtn');
+    if (decryptBtn) {
+        decryptBtn.addEventListener('click', handleDecrypt);
+    }
+
+    const downloadBtn = document.getElementById('downloadBtn');
+    if (downloadBtn) {
+        // Check if we're on the decrypt page
+        if (document.getElementById('decryptedImage')) {
+            downloadBtn.addEventListener('click', handleDownloadDecrypted);
+        } else {
+            downloadBtn.addEventListener('click', handleDownload);
+        }
+    }
+
+    const processAgainBtn = document.getElementById('processAgainBtn');
+    if (processAgainBtn) {
+        processAgainBtn.addEventListener('click', handleReset);
+    }
+
+    // Show/hide server options based on source selection
+    const sourceSelect = document.getElementById('sourceSelect');
+    if (sourceSelect) {
+        sourceSelect.addEventListener('change', function() {
+            const serverOptions = document.getElementById('serverOptions');
+            if (serverOptions) {
+                serverOptions.style.display = this.value === 'server' ? 'block' : 'none';
+            }
+        });
+    }
 });
