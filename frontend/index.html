@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Image Processing</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .mode-selection {
+            text-align: center;
+            padding: 50px 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .mode-cards {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .mode-card {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin: 10px;
+            width: 300px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+        }
+
+        .mode-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .mode-card p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+
+        .mode-card img {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+        }
+
+        .mode-btn {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        .mode-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Secure Image Processing and Transmission</h1>
+        <p>Choose your operation mode</p>
+    </header>
+
+    <div class="mode-selection">
+        <div class="mode-cards">
+            <div class="mode-card">
+                <img src="https://cdn-icons-png.flaticon.com/512/1027/1027532.png" alt="Encrypt Icon">
+                <h3>Encryption Mode</h3>
+                <p>Upload, process, and encrypt your images securely. This mode allows you to apply various image processing operations before encrypting.</p>
+                <a href="encrypt.html" class="mode-btn">Go to Encryption</a>
+            </div>
+            
+            <div class="mode-card">
+                <img src="https://cdn-icons-png.flaticon.com/512/1027/1027538.png" alt="Decrypt Icon">
+                <h3>Decryption Mode</h3>
+                <p>Upload encrypted images and decrypt them using your secret key. View and download the original processed images.</p>
+                <a href="decrypt.html" class="mode-btn">Go to Decryption</a>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
+    </footer>
+</body>
+</html> 

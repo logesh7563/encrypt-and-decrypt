@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Decryption - Secure Image Processing</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="js/app.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Secure Image Processing and Transmission</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="encrypt.html" class="nav-link">Encrypt</a>
+                <a href="decrypt.html" class="nav-link active">Decrypt</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <h2>Upload Encrypted File</h2>
+                <p class="helper-text">Please select an encrypted file with the .enc extension</p>
+                <div class="upload-container">
+                    <input type="file" id="encryptedFileInput" accept=".enc,.txt,.jpg,.png">
+                    <div class="encryption-input">
+                        <label for="decryptionKey">Decryption Key:</label>
+                        <input type="password" id="decryptionKey" required>
+                    </div>
+                    <button id="decryptBtn">Decrypt File</button>
+                </div>
+                <div id="decryptStatus" class="status"></div>
+            </section>
+
+            <section class="result-section">
+                <h2>Decrypted Image</h2>
+                <div class="result-container">
+                    <div class="image-preview">
+                        <h3>Decrypted Image</h3>
+                        <img id="decryptedImage" src="" alt="Decrypted Image">
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="saveBtn">Save Decrypted Image</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <footer>
+        <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
+    </footer>
+    
+    <script>
+        // Function to handle encrypted file upload and decryption
+        function handleEncryptedUpload() {
+            const fileInput = document.getElementById('encryptedFileInput');
+            const keyInput = document.getElementById('decryptionKey');
+            const statusDiv = document.getElementById('decryptStatus');
+            const decryptedImage = document.getElementById('decryptedImage');
+            
+            // Check if file and key are provided
+            if (!fileInput.files.length) {
+                showError('Please select a file to decrypt');
+                return;
+            }
+            
+            if (!keyInput.value.trim()) {
+                showError('Please enter a decryption key');
+                return;
+            }
+            
+            // Check if file is encrypted (should have .enc extension)
+            const fileName = fileInput.files[0].name;
+            if (!fileName.toLowerCase().endsWith('.enc')) {
+                showError('Warning: File does not have .enc extension. It may not be encrypted properly.');
+            }
+            
+            // Show loading message
+            statusDiv.innerHTML = '<p class="info">Decrypting image, please wait...</p>';
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('key', keyInput.value);
+            
+            // Send request to your Go server
+            fetch('http://localhost:8083/api/decrypt', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Get detailed error message from the response
+                    return response.text().then(text => {
+                        let errorMessage = 'Decryption failed';
+                        
+                        // Try to extract more detailed error info
+                        if (text) {
+                            try {
+                                // Check if it's JSON format
+                                const errorJson = JSON.parse(text);
+                                if (errorJson.message) {
+                                    errorMessage = errorJson.message;
+                                } else {
+                                    errorMessage = text;
+                                }
+                            } catch (e) {
+                                // If not JSON, use the text directly
+                                errorMessage = text;
+                            }
+                        }
+                        
+                        throw new Error(`${errorMessage} (Status: ${response.status})`);
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Check if the blob is an image
+                if (!blob.type.startsWith('image/')) {
+                    throw new Error(`Decryption resulted in an invalid file type: ${blob.type}. This may indicate an incorrect decryption key.`);
+                }
+                
+                // Display the decrypted image
+                const url = URL.createObjectURL(blob);
+                decryptedImage.src = url;
+                decryptedImage.style.display = "block"; // Make sure the image is visible
+                showSuccess('Image decrypted successfully');
+            })
+            .catch(error => {
+                console.error('Decryption error:', error);
+                decryptedImage.style.display = "none"; // Hide the image display
+                showError(error.message || 'Failed to decrypt image. Please verify the file is encrypted and the key is correct.');
+            });
+        }
+
+        // Helper functions to show status messages with more formatting
+        function showError(message) {
+            const statusDiv = document.getElementById('decryptStatus');
+            let errorDetails = "";
+            let recommendation = "";
+            
+            // Provide specific recommendations based on error message
+            if (message.includes("key is incorrect") || message.includes("authentication failed")) {
+                errorDetails = "The decryption key doesn't match the encryption key that was used.";
+                recommendation = `
+                    <ul>
+                        <li><strong>Double-check your decryption key</strong> - Make sure it exactly matches the key used for encryption</li>
+                        <li>Make sure the file hasn't been modified or corrupted since encryption</li>
+                        <li>Verify you're using the correct encrypted file</li>
+                    </ul>
+                `;
+            } else if (message.includes("not appear to be an image")) {
+                errorDetails = "The file was decrypted but doesn't contain image data.";
+                recommendation = `
+                    <ul>
+                        <li>The original file might not have been an image</li>
+                        <li>The file might have been encrypted using a different method</li>
+                    </ul>
+                `;
+            } else {
+                // Generic recommendations for other errors
+                recommendation = `
+                    <ul>
+                        <li>Make sure the file is properly encrypted with our encryption tool</li>
+                        <li>Check that you're using the correct decryption key</li>
+                        <li>Verify the file hasn't been corrupted or modified</li>
+                    </ul>
+                `;
+            }
+            
+            statusDiv.innerHTML = `
+                <div class="error">
+                    <strong>Error:</strong> ${message}
+                    <p>${errorDetails}</p>
+                    <p class="helper-text">Recommendations:
+                        ${recommendation}
+                    </p>
+                </div>
+            `;
+        }
+
+        function showSuccess(message) {
+            const statusDiv = document.getElementById('decryptStatus');
+            statusDiv.innerHTML = `<p class="success">${message}</p>`;
+        }
+        
+        // Function to save the decrypted image
+        function handleSaveDecrypted() {
+            const decryptedImage = document.getElementById('decryptedImage');
+            if (!decryptedImage.src || decryptedImage.src === window.location.href) {
+                showError('No decrypted image to save');
+                return;
+            }
+            
+            // Create a link to download the image
+            const a = document.createElement('a');
+            a.href = decryptedImage.src;
+            a.download = 'decrypted_image.jpg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            showSuccess('Image saved successfully');
+        }
+
+        // Add event listeners after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('decryptBtn').addEventListener('click', handleEncryptedUpload);
+            document.getElementById('saveBtn').addEventListener('click', handleSaveDecrypted);
+        });
+    </script>
+</body>
+</html>

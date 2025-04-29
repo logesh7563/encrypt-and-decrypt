@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Encryption - Secure Image Processing</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="js/app.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Secure Image Processing and Transmission</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="encrypt.html" class="nav-link active">Encrypt</a>
+                <a href="decrypt.html" class="nav-link">Decrypt</a>
+            </nav>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <h2>Upload Image</h2>
+                <div class="upload-container">
+                    <input type="file" id="imageInput" accept="image/*">
+                    <button id="uploadBtn">Upload</button>
+                </div>
+                <div id="uploadStatus" class="status"></div>
+            </section>
+
+            <section class="processing-section">
+                <h2>Process Image</h2>
+                <div class="processing-options">
+                    <select id="operationSelect">
+                        <option value="flip">Flip Vertically</option>
+                        <option value="rotate">Rotate</option>
+                        <option value="grayscale">Convert to Grayscale</option>
+                        <option value="blur">Gaussian Blur</option>
+                    </select>
+
+                    <div class="encryption-input">
+                        <label for="encryptionKey">Encryption Key:</label>
+                        <input type="password" id="encryptionKey" required>
+                    </div>
+
+                    <button id="processBtn">Process Image</button>
+                </div>
+                <div id="processingStatus" class="status"></div>
+            </section>
+
+            <section class="result-section">
+                <h2>Results</h2>
+                <div class="result-container">
+                    <div class="image-preview">
+                        <h3>Original Image</h3>
+                        <img id="originalImage" src="" alt="Original Image">
+                    </div>
+                    <div class="image-preview">
+                        <h3>Processed Image</h3>
+                        <img id="processedImage" src="" alt="Processed Image">
+                    </div>
+                </div>
+                <div class="action-buttons">
+                    <button id="downloadBtn">Download Encrypted Image</button>
+                    <button id="transmitBtn">Transmit Image</button>
+                </div>
+            </section>
+
+            <section class="transmission-section">
+                <h2>Transmit Image</h2>
+                <div class="transmission-options">
+                    <div class="server-input">
+                        <label for="serverAddress">Server Address:</label>
+                        <input type="text" id="serverAddress" placeholder="localhost:8084">
+                    </div>
+                    <div class="image-id-input">
+                        <label for="imageId">Image ID:</label>
+                        <input type="text" id="imageId" placeholder="unique_image_id">
+                    </div>
+                </div>
+                <div id="transmissionStatus" class="status"></div>
+            </section>
+        </main>
+    </div>
+    
+    <footer>
+        <p>&copy; 2023 Secure Image Processing. All rights reserved.</p>
+    </footer>
+    
+    <script>
+        // Add event listeners after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('uploadBtn').addEventListener('click', handleUpload);
+            document.getElementById('processBtn').addEventListener('click', handleProcess);
+            document.getElementById('downloadBtn').addEventListener('click', handleDownload);
+            document.getElementById('transmitBtn').addEventListener('click', handleTransmit);
+        });
+
+        function handleEncrypt() {
+            const fileInput = document.getElementById('imageInput');
+            const keyInput = document.getElementById('encryptionKey');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files.length) {
+                showError('Please select a file to encrypt');
+                return;
+            }
+            
+            if (!keyInput.value.trim()) {
+                showError('Please enter an encryption key');
+                return;
+            }
+            
+            // Show loading message
+            statusDiv.innerHTML = '<p class="info">Encrypting file, please wait...</p>';
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('key', keyInput.value);
+            
+            // Send request to encrypt
+            fetch('http://localhost:8083/api/encrypt', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        throw new Error(`Encryption failed: ${text || response.statusText}`);
+                    });
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create download link
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fileInput.files[0].name + '.enc';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                showSuccess('File encrypted successfully! Downloading encrypted file...');
+            })
+            .catch(error => {
+                console.error('Encryption error:', error);
+                showError(error.message || 'Failed to encrypt file');
+            });
+        }
+    </script>
+</body>
+</html>
