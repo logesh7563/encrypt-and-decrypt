@@ -342,6 +342,12 @@ async function handleTransmit() {
         showStatus(transmissionStatus, 'Please enter a server address.', 'error');
         return;
     }
+    
+    // Validate server address format
+    if (!isValidServerAddress(serverAddr)) {
+        showStatus(transmissionStatus, 'Invalid server address format. Use format: hostname:port or IP:port', 'error');
+        return;
+    }
 
     if (!imgId) {
         showStatus(transmissionStatus, 'Please enter an image ID.', 'error');
@@ -381,38 +387,70 @@ async function handleTransmit() {
         
         console.log(`Encrypted data: ${encryptedBytes.length} bytes, Base64 length: ${base64Data.length}`);
 
-        // 2) Transmit that encrypted payload to your TCP server
-        showStatus(transmissionStatus, 'Transmitting encrypted image...', 'info');
-        const txResp = await fetch('http://localhost:8083/api/transmit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                encryptedData: base64Data,
-                serverAddr: serverAddr,
-                imageID: imgId,
-                key: key  // Include the key for consistency
-            })
-        });
-        if (!txResp.ok) {
-            const errorText = await txResp.text();
-            throw new Error(`Transmit failed: ${txResp.status} - ${errorText}`);
-        }
-        const txJson = await txResp.json();
+        // 2) Transmit that encrypted payload to your TCP server with timeout
+        showStatus(transmissionStatus, `Transmitting encrypted image to ${serverAddr}...`, 'info');
         
-        // Save the image ID and server address in localStorage for easy decryption later
+        // Use a Promise with timeout for the API call
+        const timeout = 30000; // 30 seconds timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        
         try {
-            localStorage.setItem('lastImageId', imgId);
-            localStorage.setItem('lastServerAddr', serverAddr);
-            localStorage.setItem('lastEncryptionKey', key);
-        } catch (e) {
-            console.warn("Couldn't save transmission details to localStorage", e);
+            const txResp = await fetch('http://localhost:8083/api/transmit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    encryptedData: base64Data,
+                    serverAddr: serverAddr,
+                    imageID: imgId,
+                    key: key  // Include the key for consistency
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!txResp.ok) {
+                const errorText = await txResp.text();
+                throw new Error(`Server error (${txResp.status}): ${errorText}`);
+            }
+            
+            const txJson = await txResp.json();
+            
+            // Save the image ID and server address in localStorage for easy decryption later
+            try {
+                localStorage.setItem('lastImageId', imgId);
+                localStorage.setItem('lastServerAddr', serverAddr);
+                localStorage.setItem('lastEncryptionKey', key);
+            } catch (e) {
+                console.warn("Couldn't save transmission details to localStorage", e);
+            }
+            
+            showStatus(transmissionStatus, txJson.message, txJson.success ? 'success' : 'error');
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            
+            if (fetchError.name === 'AbortError') {
+                throw new Error(`Connection to ${serverAddr} timed out. Please check the server address and ensure the server is running.`);
+            } else {
+                throw fetchError;
+            }
         }
-        
-        showStatus(transmissionStatus, txJson.message, txJson.success ? 'success' : 'error');
     } catch (error) {
         console.error('Transmission error:', error);
         showStatus(transmissionStatus, 'Failed to transmit image: ' + error.message, 'error');
     }
+}
+
+/**
+ * Validates a server address format (host:port)
+ * @param {string} address - The server address to validate
+ * @returns {boolean} - True if valid format
+ */
+function isValidServerAddress(address) {
+    // Simple regex to validate host:port format
+    const regex = /^([a-zA-Z0-9.-]+|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d{1,5}$/;
+    return regex.test(address);
 }
 
 /**

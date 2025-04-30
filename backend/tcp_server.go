@@ -79,7 +79,7 @@ func handleConnection(conn net.Conn) {
 	}
 }
 
-// handleImageRequest sends requested encrypted image back to client
+
 func handleImageRequest(conn net.Conn) error {
 	// Read image ID length (4 bytes)
 	idLenBuf := make([]byte, 4)
@@ -171,11 +171,25 @@ func handleImageTransfer(conn net.Conn) {
 
 // SendImageViaTCP sends an encrypted image to a TCP server
 func SendImageViaTCP(imageID string, encryptedData []byte, serverAddr string) error {
-	conn, err := net.Dial("tcp", serverAddr)
+	log.Printf("SendImageViaTCP: Attempting to connect to %s", serverAddr)
+
+	// Set a dialer with timeout
+	dialer := net.Dialer{
+		Timeout: 10 * time.Second,
+	}
+
+	conn, err := dialer.Dial("tcp", serverAddr)
 	if err != nil {
-		return err
+		log.Printf("SendImageViaTCP: Connection error: %v", err)
+		return fmt.Errorf("failed to connect to server %s: %v", serverAddr, err)
 	}
 	defer conn.Close()
+
+	log.Printf("SendImageViaTCP: Connected to %s, sending image '%s' (%d bytes)",
+		serverAddr, imageID, len(encryptedData))
+
+	// Set reasonable timeout
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	// Create buffer for the complete message
 	var buf bytes.Buffer
@@ -199,19 +213,25 @@ func SendImageViaTCP(imageID string, encryptedData []byte, serverAddr string) er
 	// Send the complete message
 	_, err = conn.Write(buf.Bytes())
 	if err != nil {
-		return err
+		log.Printf("SendImageViaTCP: Failed to write data: %v", err)
+		return fmt.Errorf("failed to send data to server: %v", err)
 	}
 
-	// Wait for confirmation
+	log.Printf("SendImageViaTCP: Data sent, waiting for confirmation from server")
+
+	// Wait for confirmation with timeout
 	confirmBuf := make([]byte, 1)
 	if _, err := io.ReadFull(conn, confirmBuf); err != nil {
-		return err
+		log.Printf("SendImageViaTCP: Failed to read confirmation: %v", err)
+		return fmt.Errorf("no confirmation received from server: %v", err)
 	}
 
 	if confirmBuf[0] != ConfirmationMessage {
-		return err
+		log.Printf("SendImageViaTCP: Received invalid confirmation code: %d", confirmBuf[0])
+		return fmt.Errorf("received invalid confirmation code from server")
 	}
 
+	log.Printf("SendImageViaTCP: Image successfully transmitted to %s", serverAddr)
 	return nil
 }
 
