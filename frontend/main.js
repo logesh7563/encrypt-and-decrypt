@@ -201,26 +201,55 @@ async function handleTransmit() {
     }
 
     try {
-        const response = await fetch('/api/transmit', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                encryptedData: processedImageData,
-                serverAddr: serverAddr,
-                imageID: imgId
-            })
-        });
+        // Encrypt image using server encrypt endpoint
+        showStatus(transmissionStatus, 'Encrypting image for transmission...', 'info');
+        // Convert processedImageData (dataURL) to blob
+        const resp = await fetch(processedImageData);
+        const imgBlob = await resp.blob();
 
-        const data = await response.json();
+        const encForm = new FormData();
+        encForm.append('file', imgBlob, 'image.png');
+        encForm.append('key', key);
+
+        const encResp = await fetch('/api/encrypt', { method: 'POST', body: encForm });
+        if (!encResp.ok) {
+            const errText = await encResp.text();
+            throw new Error(`Encryption for transmission failed: ${errText || encResp.statusText}`);
+        }
+        // Get raw encrypted binary
+        const encryptedBuffer = await encResp.arrayBuffer();
+        const encryptedBytes = new Uint8Array(encryptedBuffer);
+        let binaryStr = '';
+        encryptedBytes.forEach(b => binaryStr += String.fromCharCode(b));
+        const base64Data = btoa(binaryStr);
+
+        // Transmit encrypted image
+        showStatus(transmissionStatus, 'Transmitting encrypted image...', 'info');
+        const transmitResp = await fetch('/api/transmit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ encryptedData: base64Data, serverAddr, imageID: imgId })
+        });
+        if (!transmitResp.ok) {
+            const errText = await transmitResp.text();
+            throw new Error(`Transmission failed: ${errText || transmitResp.statusText}`);
+        }
+        const data = await transmitResp.json();
         if (data.success) {
             showStatus(transmissionStatus, data.message, 'success');
+            if (confirm('Transmission successful! Do you want to decrypt this image from the server?')) {
+                localStorage.setItem('serverAddress', serverAddr);
+                localStorage.setItem('imageId', imgId);
+                localStorage.setItem('decryptKey', key);
+                localStorage.setItem('fromTransmission', 'true');
+                window.location.href = 'decrypt.html';
+            }
         } else {
             showStatus(transmissionStatus, data.message, 'error');
         }
     } catch (error) {
-        showStatus(transmissionStatus, 'Failed to transmit image', 'error');
+        console.error('Transmission error:', error);
+        showStatus(transmissionStatus, 'Failed to transmit image: ' + error.message, 'error');
     }
 }
 
@@ -244,4 +273,4 @@ function showStatus(element, message, type) {
 console.log('Initializing UI state');
 processBtn.disabled = true;
 downloadBtn.disabled = true;
-transmitBtn.disabled = true; 
+transmitBtn.disabled = true;

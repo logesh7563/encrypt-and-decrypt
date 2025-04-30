@@ -3,10 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"net"
-	"os"
 	"sync"
 	"time"
 )
@@ -80,57 +80,48 @@ func handleConnection(conn net.Conn) {
 }
 
 // handleImageRequest sends requested encrypted image back to client
-func handleImageRequest(conn net.Conn) {
-	// Read image ID (fixed-length for simplicity)
+func handleImageRequest(conn net.Conn) error {
+	// Read image ID length (4 bytes)
 	idLenBuf := make([]byte, 4)
 	if _, err := io.ReadFull(conn, idLenBuf); err != nil {
-		log.Printf("Error reading ID length: %v", err)
-		return
+		return fmt.Errorf("failed to read ID length: %v", err)
 	}
-
 	idLen := binary.BigEndian.Uint32(idLenBuf)
+
+	// Read image ID
 	idBuf := make([]byte, idLen)
 	if _, err := io.ReadFull(conn, idBuf); err != nil {
-		log.Printf("Error reading image ID: %v", err)
-		return
+		return fmt.Errorf("failed to read image ID: %v", err)
 	}
-
 	imageID := string(idBuf)
 
-	// Read the image from storage
+	// Retrieve the encrypted image data from storage
 	encryptedImageStoreMutex.RLock()
 	imageData, exists := encryptedImageStore[imageID]
 	encryptedImageStoreMutex.RUnlock()
 
-	// Prepare header for response
-	header := []byte{ImageDataResponse}
-
 	if !exists {
-		// Send empty data if image doesn't exist
-		sizeBytes := make([]byte, 4)
-		binary.BigEndian.PutUint32(sizeBytes, 0)
-
-		response := append(header, sizeBytes...)
-		if _, err := conn.Write(response); err != nil {
-			log.Printf("Error sending empty response: %v", err)
-		}
-		return
+		return fmt.Errorf("image with ID %s not found", imageID)
 	}
 
-	// Send the image data
-	sizeBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(sizeBytes, uint32(len(imageData)))
-
-	// Combine header, size, and data
-	response := append(header, sizeBytes...)
-	response = append(response, imageData...)
-
-	if _, err := conn.Write(response); err != nil {
-		log.Printf("Error sending image data: %v", err)
-		return
+	// Send response message type
+	if _, err := conn.Write([]byte{ImageDataResponse}); err != nil {
+		return fmt.Errorf("failed to send response type: %v", err)
 	}
 
-	log.Printf("Sent image '%s' (%d bytes) to client", imageID, len(imageData))
+	// Send data length
+	dataLenBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(dataLenBuf, uint32(len(imageData)))
+	if _, err := conn.Write(dataLenBuf); err != nil {
+		return fmt.Errorf("failed to send data length: %v", err)
+	}
+
+	// Send image data
+	if _, err := conn.Write(imageData); err != nil {
+		return fmt.Errorf("failed to send image data: %v", err)
+	}
+
+	return nil
 }
 
 // handleImageTransfer receives and stores encrypted image from client
@@ -225,66 +216,77 @@ func SendImageViaTCP(imageID string, encryptedData []byte, serverAddr string) er
 }
 
 // RequestImageViaTCP requests and receives an encrypted image from a TCP server
-func RequestImageViaTCP(imageID string, serverAddr string, outputPath string) error {
-	// Connect to the server
+func RequestImageViaTCP(serverAddr, imageID string) ([]byte, error) {
+	log.Printf("RequestImageViaTCP: Requesting image '%s' from %s", imageID, serverAddr)
+
+	// Connect to the TCP server
 	conn, err := net.Dial("tcp", serverAddr)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to connect to server: %v", err)
 	}
 	defer conn.Close()
 
-	// Set timeouts
+	// Set a reasonable timeout
 	conn.SetDeadline(time.Now().Add(30 * time.Second))
 
-	// Create request message
-	var buf bytes.Buffer
-
-	// Add message type
-	buf.WriteByte(ImageDataRequest)
-
-	// Add image ID length and ID
+	// Prepare image ID data
 	idBytes := []byte(imageID)
-	idLenBytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(idLenBytes, uint32(len(idBytes)))
-	buf.Write(idLenBytes)
-	buf.Write(idBytes)
+	idLen := len(idBytes)
+	log.Printf("RequestImageViaTCP: Image ID length: %d bytes", idLen)
 
-	// Send the request
-	if _, err := conn.Write(buf.Bytes()); err != nil {
-		return err
+	// Send message type
+	if _, err := conn.Write([]byte{ImageDataRequest}); err != nil {
+		return nil, fmt.Errorf("failed to send message type: %v", err)
 	}
 
-	// Read response type
-	responseBuf := make([]byte, 1)
-	if _, err := io.ReadFull(conn, responseBuf); err != nil {
-		return err
+	// Send image ID length (4 bytes)
+	idLenBuf := make([]byte, 4)
+	binary.BigEndian.PutUint32(idLenBuf, uint32(idLen))
+	if _, err := conn.Write(idLenBuf); err != nil {
+		return nil, fmt.Errorf("failed to send ID length: %v", err)
 	}
 
-	if responseBuf[0] != ImageDataResponse {
-		return err
+	// Send image ID
+	if _, err := conn.Write(idBytes); err != nil {
+		return nil, fmt.Errorf("failed to send image ID: %v", err)
 	}
 
-	// Read data size
-	sizeBytes := make([]byte, 4)
-	if _, err := io.ReadFull(conn, sizeBytes); err != nil {
-		return err
+	// Read the response message type
+	msgTypeBuf := make([]byte, 1)
+	if _, err := io.ReadFull(conn, msgTypeBuf); err != nil {
+		return nil, fmt.Errorf("failed to read response type: %v", err)
 	}
 
-	dataSize := binary.BigEndian.Uint32(sizeBytes)
-	if dataSize == 0 {
-		return err
+	if msgTypeBuf[0] != ImageDataResponse {
+		return nil, fmt.Errorf("unexpected response type: %d", msgTypeBuf[0])
 	}
 
-	// Read the image data
-	data := make([]byte, dataSize)
-	if _, err := io.ReadFull(conn, data); err != nil {
-		return err
+	// Read data length (4 bytes)
+	dataLenBuf := make([]byte, 4)
+	if _, err := io.ReadFull(conn, dataLenBuf); err != nil {
+		return nil, fmt.Errorf("failed to read data length: %v", err)
+	}
+	dataLen := binary.BigEndian.Uint32(dataLenBuf)
+	log.Printf("RequestImageViaTCP: Receiving %d bytes of image data", dataLen)
+
+	// Validate data length to prevent potential issues
+	if dataLen == 0 {
+		return nil, fmt.Errorf("received zero-length data")
 	}
 
-	// Save to file if outputPath is specified
-	if outputPath != "" {
-		return os.WriteFile(outputPath, data, 0644)
+	if dataLen > 100*1024*1024 { // 100 MB limit
+		return nil, fmt.Errorf("data length too large: %d bytes", dataLen)
 	}
 
-	return nil
+	// Read image data
+	imageData := make([]byte, dataLen)
+	bytesRead, err := io.ReadFull(conn, imageData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read image data: %v (read %d of %d bytes)",
+			err, bytesRead, dataLen)
+	}
+
+	log.Printf("RequestImageViaTCP: Successfully received %d bytes", bytesRead)
+
+	return imageData, nil
 }

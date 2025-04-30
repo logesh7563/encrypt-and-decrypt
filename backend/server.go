@@ -46,41 +46,50 @@ type ImageResponse struct {
 	Data    string `json:"data,omitempty"`
 }
 
-// StartServer initializes and starts the HTTP server
-func StartServer() {
-	// Create upload and processed directories if they don't exist
-	if err := os.MkdirAll(UploadPath, 0755); err != nil {
-		log.Fatal("Failed to create upload directory:", err)
-	}
-	if err := os.MkdirAll(ProcessedPath, 0755); err != nil {
-		log.Fatal("Failed to create processed directory:", err)
-	}
+// RequestDecryptRequest is the client request for retrieving and decrypting an image
+type RequestDecryptRequest struct {
+	ServerAddr string `json:"serverAddr"`
+	ImageID    string `json:"imageID"`
+	Key        string `json:"key"`
+}
 
-	// Create router
+// RequestDecryptResponse is the response from the request-decrypt endpoint
+// Data contains the decrypted image as base64
+// Message is used on error
+type RequestDecryptResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Data    string `json:"data,omitempty"`
+}
+
+// StartServer initializes and starts the HTTP server
+func StartServer(port string) {
 	router := mux.NewRouter()
 
-	// API routes
-	apiRouter := router.PathPrefix("/api").Subrouter()
-	apiRouter.HandleFunc("/upload", handleUpload).Methods("POST", "OPTIONS")
-	apiRouter.HandleFunc("/process", handleProcess).Methods("POST", "OPTIONS")
-	apiRouter.HandleFunc("/download", handleDownload).Methods("GET", "OPTIONS")
-	apiRouter.HandleFunc("/transmit", handleTransmit).Methods("POST", "OPTIONS")
-	apiRouter.HandleFunc("/decrypt", handleDecrypt).Methods("POST", "OPTIONS")
-	apiRouter.HandleFunc("/encrypt", handleEncrypt).Methods("POST", "OPTIONS")
+	// Add existing routes
+	router.HandleFunc("/api/upload", handleUpload)
+	router.HandleFunc("/api/process", handleProcess)
+	router.HandleFunc("/api/encrypt", handleEncrypt)
+	router.HandleFunc("/api/decrypt", handleDecrypt)
+	router.HandleFunc("/api/transmit", handleTransmit)
+	router.HandleFunc("/api/request-image", handleRequestImage)
+	router.HandleFunc("/api/request-decrypt", handleRequestDecrypt)
+	router.HandleFunc("/api/server-decrypt", handleServerDecrypt)
+	router.HandleFunc("/api/get-decrypted-image", handleGetDecryptedImage) // New endpoint for reliable image downloads
 
-	// Serve static files from the frontend directory
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("../frontend")))
+	// Add static file serving
+	fs := http.FileServer(http.Dir("../frontend"))
+	router.PathPrefix("/").Handler(http.StripPrefix("/", fs))
 
-	// Add middleware for CORS and logging
-	handler := corsMiddleware(loggingMiddleware(router))
+	// Apply middleware
+	router.Use(corsMiddleware)
+	router.Use(loggingMiddleware)
 
-	// Start TCP server in a goroutine
-	go StartTCPServer()
-
-	// Start HTTP server
-	log.Printf("HTTP server starting on port %s", HTTPPort)
-	if err := http.ListenAndServe(":"+HTTPPort, handler); err != nil {
-		log.Fatal("Failed to start server:", err)
+	// Start the server
+	log.Printf("Starting HTTP server on port %s...", port)
+	err := http.ListenAndServe(":"+port, router)
+	if err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
 }
 
@@ -363,6 +372,7 @@ func handleTransmit(w http.ResponseWriter, r *http.Request) {
 		EncryptedData string `json:"encryptedData"`
 		ServerAddr    string `json:"serverAddr"`
 		ImageID       string `json:"imageID"`
+		Key           string `json:"key"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -370,15 +380,22 @@ func handleTransmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Decode encrypted data
-	encryptedData, err := base64.StdEncoding.DecodeString(req.EncryptedData)
+	// Decode base64 image data into raw bytes
+	rawData, err := base64.StdEncoding.DecodeString(req.EncryptedData)
 	if err != nil {
-		sendError(w, "Invalid encrypted data", http.StatusBadRequest)
+		sendError(w, "Invalid image data", http.StatusBadRequest)
 		return
 	}
 
-	// Send image via TCP
-	err = SendImageViaTCP(req.ImageID, encryptedData, req.ServerAddr)
+	// Encrypt the data with provided key
+	encryptedBytes, err := EncryptData(rawData, req.Key)
+	if err != nil {
+		sendError(w, "Failed to encrypt data for transmission", http.StatusInternalServerError)
+		return
+	}
+
+	// Send encrypted image via TCP
+	err = SendImageViaTCP(req.ImageID, encryptedBytes, req.ServerAddr)
 	if err != nil {
 		sendError(w, "Failed to transmit image", http.StatusInternalServerError)
 		return
@@ -435,7 +452,8 @@ func handleDecrypt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Received file: %s, size: %d bytes, attempting to decrypt", header.Filename, len(encryptedData))
+	log.Printf("Received file: %s, size: %d bytes, key length: %d, attempting to decrypt",
+		header.Filename, len(encryptedData), len(key))
 
 	// Try to decrypt the data
 	decryptedData, err := DecryptData(encryptedData, key)
@@ -522,6 +540,317 @@ func handleEncrypt(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleRequestImage handles requests to retrieve images from a TCP server
+func handleRequestImage(w http.ResponseWriter, r *http.Request) {
+	// Parse the JSON request
+	var req struct {
+		ServerAddr string `json:"serverAddr"`
+		ImageID    string `json:"imageID"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Requesting image with ID '%s' from server %s", req.ImageID, req.ServerAddr)
+
+	// Request the image from the TCP server
+	encryptedData, err := RequestImageViaTCP(req.ServerAddr, req.ImageID)
+	if err != nil {
+		log.Printf("Error requesting image from TCP server: %v", err)
+		sendError(w, "Failed to retrieve image: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully retrieved encrypted image data (%d bytes)", len(encryptedData))
+
+	// Convert binary data to base64 for JSON transmission
+	base64Data := base64.StdEncoding.EncodeToString(encryptedData)
+
+	// Send the encrypted data back to the client
+	response := struct {
+		Success       bool   `json:"success"`
+		Message       string `json:"message"`
+		EncryptedData string `json:"encryptedData"`
+	}{
+		Success:       true,
+		Message:       "Image retrieved successfully",
+		EncryptedData: base64Data,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleRequestDecrypt retrieves the encrypted image via TCP, decrypts it, and returns base64 data
+func handleRequestDecrypt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req RequestDecryptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendError(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.ServerAddr == "" || req.ImageID == "" || req.Key == "" {
+		sendError(w, "Missing serverAddr, imageID, or key", http.StatusBadRequest)
+		return
+	}
+
+	// Log complete request for debugging
+	log.Printf("Decrypt request: serverAddr=%s, imageID=%s, key length=%d",
+		req.ServerAddr, req.ImageID, len(req.Key))
+
+	// Retrieve encrypted bytes from TCP server
+	encryptedData, err := RequestImageViaTCP(req.ServerAddr, req.ImageID)
+	if err != nil {
+		log.Printf("Error retrieving image: %v", err)
+		sendError(w, "Failed to retrieve image: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log.Printf("Retrieved encrypted data: %d bytes, first 16 bytes: %x", len(encryptedData), encryptedData[:min(16, len(encryptedData))])
+
+	// Prepare various keys to try - the exact same key, padded key, and hashed key
+	var keys []struct {
+		name string
+		key  string
+	} = []struct {
+		name string
+		key  string
+	}{
+		{"original", req.Key},
+		{"padded", string(padKey(req.Key))},
+		{"hashed", fmt.Sprintf("%x", sha256.Sum256([]byte(req.Key)))},
+	}
+
+	var successfulDecryption bool
+	var decryptedData []byte
+	var decryptErr error
+
+	// Try each key with original data and potentially base64-decoded data
+	for _, k := range keys {
+		// Try the key on original data
+		decryptedData, decryptErr = DecryptData(encryptedData, k.key)
+		if decryptErr == nil {
+			log.Printf("Successfully decrypted with %s key", k.name)
+			successfulDecryption = true
+			break
+		}
+
+		log.Printf("Decryption with %s key failed: %v", k.name, decryptErr)
+
+		// Try base64 decoding the data first (in case it's double encoded)
+		if decodedData, err := base64.StdEncoding.DecodeString(string(encryptedData)); err == nil {
+			decryptedData, decryptErr = DecryptData(decodedData, k.key)
+			if decryptErr == nil {
+				log.Printf("Successfully decrypted base64-decoded data with %s key", k.name)
+				successfulDecryption = true
+				break
+			}
+		}
+	}
+
+	if !successfulDecryption {
+		log.Printf("All decryption attempts failed")
+		sendError(w, "Failed to decrypt data: "+decryptErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Now that we have decrypted data, see if it's an image or further encoded
+	contentType := http.DetectContentType(decryptedData)
+	log.Printf("Decrypted data content type: %s", contentType)
+
+	// If it doesn't look like an image, it might be a base64 encoded image
+	if !strings.HasPrefix(contentType, "image/") && len(decryptedData) > 0 {
+		// Try to decode as base64
+		if possibleImageData, err := base64.StdEncoding.DecodeString(string(decryptedData)); err == nil {
+			possibleContentType := http.DetectContentType(possibleImageData)
+			log.Printf("After base64 decoding: content type: %s", possibleContentType)
+
+			if strings.HasPrefix(possibleContentType, "image/") {
+				log.Printf("Found base64-encoded image after decryption")
+				decryptedData = possibleImageData
+			}
+		}
+	}
+
+	// For safety, ensure we're always returning valid data even if the content type isn't what we expect
+	log.Printf("Final decrypted data size: %d bytes", len(decryptedData))
+
+	// Encode to base64 for JSON transmission to frontend
+	b64 := base64.StdEncoding.EncodeToString(decryptedData)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(RequestDecryptResponse{
+		Success: true,
+		Data:    b64,
+	})
+}
+
+// handleGetDecryptedImage handles requests for properly formatted decrypted images
+func handleGetDecryptedImage(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers for browser compatibility
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Parse the multipart form
+	err := r.ParseMultipartForm(MaxUploadSize)
+	if err != nil {
+		sendError(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get the file and key from the form
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		sendError(w, "No file received: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	key := r.FormValue("key")
+	if key == "" {
+		sendError(w, "Decryption key is required", http.StatusBadRequest)
+		return
+	}
+
+	// Read the encrypted file
+	encryptedData, err := io.ReadAll(file)
+	if err != nil {
+		sendError(w, "Failed to read encrypted file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("GetDecryptedImage: Received file: %s, size: %d bytes, key length: %d, attempting to decrypt",
+		header.Filename, len(encryptedData), len(key))
+
+	// Try to decrypt the data
+	decryptedData, err := DecryptData(encryptedData, key)
+	if err != nil {
+		log.Printf("Decryption error: %v", err)
+		sendError(w, "Failed to decrypt data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Decryption successful, decrypted size: %d bytes", len(decryptedData))
+
+	// Try to determine the content type
+	contentType := http.DetectContentType(decryptedData)
+	log.Printf("Detected content type: %s", contentType)
+
+	// Ensure we're dealing with an image - if not, try to decode base64
+	if !strings.HasPrefix(contentType, "image/") {
+		// Try to decode as base64 in case it's a base64-encoded image
+		if possibleImageData, err := base64.StdEncoding.DecodeString(string(decryptedData)); err == nil {
+			possibleContentType := http.DetectContentType(possibleImageData)
+			if strings.HasPrefix(possibleContentType, "image/") {
+				log.Printf("Found base64-encoded image after decryption, content type: %s", possibleContentType)
+				decryptedData = possibleImageData
+				contentType = possibleContentType
+			}
+		}
+	}
+
+	// Force image/png content type and proper filename with .png extension
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="decrypted_image.png"`))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(decryptedData)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(decryptedData)
+}
+
+// handleServerDecrypt is a specialized function to handle decryption of images retrieved from TCP servers
+func handleServerDecrypt(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers for browser compatibility
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Parse the multipart form
+	err := r.ParseMultipartForm(MaxUploadSize)
+	if err != nil {
+		sendError(w, "Failed to parse form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get the file and key from the form
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		sendError(w, "No file received: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	key := r.FormValue("key")
+	if key == "" {
+		sendError(w, "Decryption key is required", http.StatusBadRequest)
+		return
+	}
+
+	// Read the encrypted file
+	encryptedData, err := io.ReadAll(file)
+	if err != nil {
+		sendError(w, "Failed to read encrypted file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Server decrypt: Received file: %s, size: %d bytes", header.Filename, len(encryptedData))
+
+	// Generate a consistent key hash for debugging
+	hasher := sha256.New()
+	hasher.Write([]byte(key))
+	keyHash := fmt.Sprintf("%x", hasher.Sum(nil)[:8])
+	log.Printf("Using key with hash prefix: %s", keyHash)
+
+	// First try direct decryption using DecryptData
+	log.Printf("handleServerDecrypt: attempting direct decryption, data size: %d bytes", len(encryptedData))
+	decryptedData, err := DecryptData(encryptedData, key)
+	if err != nil {
+		log.Printf("handleServerDecrypt: direct decryption failed: %v", err)
+		// Try base64 decoding first in case it's double-encoded
+		decodedData, decodeErr := base64.StdEncoding.DecodeString(string(encryptedData))
+		if decodeErr == nil {
+			log.Printf("handleServerDecrypt: base64 decode succeeded, new size: %d bytes", len(decodedData))
+			decryptedData, err = DecryptData(decodedData, key)
+			if err != nil {
+				log.Printf("handleServerDecrypt: secondary decryption attempt failed: %v", err)
+			}
+		} else {
+			log.Printf("handleServerDecrypt: base64 decode error: %v", decodeErr)
+		}
+		// If all attempts fail, return error
+		if err != nil {
+			log.Printf("handleServerDecrypt: final decryption error: %v", err)
+			sendError(w, "Failed to decrypt data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	log.Printf("Decryption successful, decrypted size: %d bytes", len(decryptedData))
+
+	// Try to determine the content type
+	contentType := http.DetectContentType(decryptedData)
+	log.Printf("Detected content type: %s", contentType)
+
+	// Set the appropriate content type and write the decrypted data
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(decryptedData)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(decryptedData)
+}
+
 // Helper function to check if a string is base64 encoded
 func isBase64(s string) bool {
 	_, err := base64.StdEncoding.DecodeString(s)
@@ -545,5 +874,17 @@ func sendJSON(w http.ResponseWriter, response ImageResponse) {
 }
 
 func main() {
-	StartServer()
+	// Start the TCP server in a goroutine so it runs in the background
+	go StartTCPServer()
+
+	// Start the HTTP server
+	StartServer(HTTPPort)
+}
+
+// Helper function for min of integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

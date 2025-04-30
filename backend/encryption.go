@@ -22,7 +22,10 @@ func deriveKey(password string) []byte {
 	// Use SHA-256 to derive a 32-byte key from the password
 	hasher := sha256.New()
 	hasher.Write([]byte(password))
-	return hasher.Sum(nil)
+	key := hasher.Sum(nil)
+	fmt.Printf("Debug - Key derivation: password length=%d, derived key prefix=%x...\n",
+		len(password), key[:4]) // Log first 4 bytes of derived key for debugging
+	return key
 }
 
 // EncryptData encrypts data using AES-256 in GCM mode
@@ -62,6 +65,10 @@ func DecryptData(encryptedData []byte, password string) ([]byte, error) {
 		return nil, errors.New("no data to decrypt")
 	}
 
+	// Add debug logging
+	fmt.Printf("DecryptData: Decrypting %d bytes with password of length %d\n",
+		len(encryptedData), len(password))
+
 	// Derive 32-byte key for AES-256
 	key := deriveKey(password)
 
@@ -84,6 +91,14 @@ func DecryptData(encryptedData []byte, password string) ([]byte, error) {
 	}
 
 	nonce, ciphertext := encryptedData[:nonceSize], encryptedData[nonceSize:]
+	fmt.Printf("DecryptData: Using nonce of size %d, first bytes: %x\n",
+		nonceSize, nonce[:4])
+
+	// Try to detect base64-encoded data
+	if isLikelyBase64(string(encryptedData)) {
+		fmt.Println("DecryptData: Warning - input data appears to be base64 encoded. " +
+			"This may cause decryption to fail.")
+	}
 
 	// Decrypt and verify data
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
@@ -94,7 +109,30 @@ func DecryptData(encryptedData []byte, password string) ([]byte, error) {
 		return nil, fmt.Errorf("decryption failed: %w", err)
 	}
 
+	fmt.Printf("DecryptData: Successfully decrypted %d bytes\n", len(plaintext))
 	return plaintext, nil
+}
+
+// isLikelyBase64 checks if a string is likely base64 encoded
+func isLikelyBase64(s string) bool {
+	// Quick check: base64 strings should be mostly alphanumeric plus + and /
+	// And possibly have = padding at the end
+	if len(s) == 0 {
+		return false
+	}
+
+	// Count characters that are valid in base64
+	validChars := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+	validCount := 0
+
+	for _, c := range s {
+		if strings.Contains(validChars, string(c)) {
+			validCount++
+		}
+	}
+
+	// If more than 90% of characters are valid base64 chars, it's likely base64
+	return float64(validCount)/float64(len(s)) > 0.90
 }
 
 // EncryptToBase64 encrypts data using AES-GCM and returns it as a base64 string
@@ -150,7 +188,6 @@ func DecryptFromBase64(encryptedBase64 string, key string) ([]byte, error) {
 		return nil, fmt.Errorf("ciphertext too short")
 	}
 
-	// Extract nonce from ciphertext
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
 
 	// Decrypt and verify data

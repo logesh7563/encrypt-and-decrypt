@@ -324,62 +324,94 @@ async function handleDownload() {
 }
 
 /**
- * Handles transmission of the encrypted image to a server
+ * Handles image transmission
  */
 async function handleTransmit() {
-    const statusElement = document.getElementById('transmissionStatus');
-    const serverAddress = document.getElementById('serverAddress').value || 'localhost:8084';
-    const imageId = document.getElementById('imageId').value || `img_${Date.now()}`;
-    const encryptionKey = document.getElementById('encryptionKey').value;
-    
+    const transmissionStatus = document.getElementById('transmissionStatus');
+    const serverAddr = document.getElementById('serverAddress').value;
+    const imgId = document.getElementById('imageId').value;
+    const key = document.getElementById('encryptionKey').value;
+
+    // Input validation
+    if (!processedImageData) {
+        showStatus(transmissionStatus, 'Please process an image first.', 'error');
+        return;
+    }
+
+    if (!serverAddr) {
+        showStatus(transmissionStatus, 'Please enter a server address.', 'error');
+        return;
+    }
+
+    if (!imgId) {
+        showStatus(transmissionStatus, 'Please enter an image ID.', 'error');
+        return;
+    }
+
+    if (!key) {
+        showStatus(transmissionStatus, 'Please enter an encryption key.', 'error');
+        return;
+    }
+
     try {
-        if (!processedImageData) {
-            statusElement.textContent = "Please process an image first.";
-            statusElement.className = "status error";
-            return;
-        }
-        
-        if (!encryptionKey) {
-            statusElement.textContent = "Please enter an encryption key.";
-            statusElement.className = "status error";
-            return;
-        }
-        
-        statusElement.textContent = "Transmitting image...";
-        statusElement.className = "status loading";
-        
-        // Create the protocol (http or https)
-        const protocol = window.location.protocol === 'https:' ? 'https' : 'http';
-        const serverUrl = `${protocol}://${serverAddress}/api/upload`;
-        
-        // Convert base64 data URL to blob
-        const response = await fetch(processedImageData);
-        const blob = await response.blob();
-        
-        // Create form data
-        const formData = new FormData();
-        formData.append('image', blob, 'image.png');
-        formData.append('key', encryptionKey);
-        formData.append('id', imageId);
-        
-        // Send to server
-        const uploadResponse = await fetch(serverUrl, {
+        // 1) Encrypt processedImageData via your HTTP /api/encrypt endpoint
+        showStatus(transmissionStatus, 'Encrypting image for transmission...', 'info');
+        console.log(`Encrypting with key: "${key}"`); // Debug log the key being used
+        const pngResp = await fetch(processedImageData);
+        const pngBlob = await pngResp.blob();
+        const encForm = new FormData();
+        encForm.append('file', pngBlob, 'image.png');
+        encForm.append('key', key);
+
+        const encResp = await fetch('http://localhost:8083/api/encrypt', {
             method: 'POST',
-            body: formData
+            body: encForm
         });
+        if (!encResp.ok) {
+            const errText = await encResp.text();
+            throw new Error(`Encryption failed: ${errText || encResp.statusText}`);
+        }
+        const encryptedBuffer = await encResp.arrayBuffer();
+        const encryptedBytes = new Uint8Array(encryptedBuffer);
         
-        if (!uploadResponse.ok) {
-            throw new Error(`HTTP error! status: ${uploadResponse.status}`);
+        // Convert to base64 without any encoding issues
+        let binaryStr = '';
+        encryptedBytes.forEach(b => binaryStr += String.fromCharCode(b));
+        const base64Data = btoa(binaryStr);
+        
+        console.log(`Encrypted data: ${encryptedBytes.length} bytes, Base64 length: ${base64Data.length}`);
+
+        // 2) Transmit that encrypted payload to your TCP server
+        showStatus(transmissionStatus, 'Transmitting encrypted image...', 'info');
+        const txResp = await fetch('http://localhost:8083/api/transmit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                encryptedData: base64Data,
+                serverAddr: serverAddr,
+                imageID: imgId,
+                key: key  // Include the key for consistency
+            })
+        });
+        if (!txResp.ok) {
+            const errorText = await txResp.text();
+            throw new Error(`Transmit failed: ${txResp.status} - ${errorText}`);
+        }
+        const txJson = await txResp.json();
+        
+        // Save the image ID and server address in localStorage for easy decryption later
+        try {
+            localStorage.setItem('lastImageId', imgId);
+            localStorage.setItem('lastServerAddr', serverAddr);
+            localStorage.setItem('lastEncryptionKey', key);
+        } catch (e) {
+            console.warn("Couldn't save transmission details to localStorage", e);
         }
         
-        const result = await uploadResponse.json();
-        
-        statusElement.textContent = `Image transmitted successfully! ID: ${result.id || imageId}`;
-        statusElement.className = "status success";
+        showStatus(transmissionStatus, txJson.message, txJson.success ? 'success' : 'error');
     } catch (error) {
-        console.error("Transmission error:", error);
-        statusElement.textContent = `Transmission failed: ${error.message}`;
-        statusElement.className = "status error";
+        console.error('Transmission error:', error);
+        showStatus(transmissionStatus, 'Failed to transmit image: ' + error.message, 'error');
     }
 }
 
@@ -389,17 +421,93 @@ async function handleTransmit() {
 async function handleDecrypt() {
     const statusElement = document.getElementById('decryptionStatus');
     const decryptionKey = document.getElementById('decryptionKey').value;
-    const sourceSelect = document.getElementById('sourceSelect');
     
     try {
-        if (!originalImageData) {
-            statusElement.textContent = "Please upload an image first.";
+        // Check for decryption key
+        if (!decryptionKey) {
+            statusElement.textContent = "Please enter a decryption key.";
             statusElement.className = "status error";
             return;
         }
-        
-        if (!decryptionKey) {
-            statusElement.textContent = "Please enter a decryption key.";
+
+        // Check if retrieving from server
+        const sourceSelect = document.getElementById('sourceSelect');
+        if (sourceSelect && sourceSelect.value === 'server') {
+            const serverAddr = document.getElementById('serverAddress').value;
+            const imgId = document.getElementById('imageId').value;
+            if (!serverAddr || !imgId) {
+                statusElement.textContent = "Please enter server address and image ID.";
+                statusElement.className = "status error";
+                return;
+            }
+            
+            statusElement.textContent = "Retrieving and decrypting image...";
+            statusElement.className = "status loading";
+            
+            try {
+                // First try to get the raw encrypted data from the server
+                const imageResponse = await fetch('http://localhost:8083/api/request-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serverAddr, imageID: imgId })
+                });
+                
+                if (!imageResponse.ok) {
+                    throw new Error(`Failed to retrieve image from server: ${imageResponse.status}`);
+                }
+                
+                const imageResult = await imageResponse.json();
+                if (!imageResult.success || !imageResult.encryptedData) {
+                    throw new Error(imageResult.message || "Failed to retrieve encrypted image data");
+                }
+                
+                // Now we have the encrypted data as base64, convert it to binary form
+                const binary = atob(imageResult.encryptedData);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                
+                // Create a blob and form data for decryption
+                const blob = new Blob([bytes]);
+                const formData = new FormData();
+                formData.append('file', blob, 'image.enc');
+                formData.append('key', decryptionKey);
+                
+                // Use the server's decrypt endpoint directly instead of request-decrypt
+                const decryptResponse = await fetch('http://localhost:8083/api/decrypt', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!decryptResponse.ok) {
+                    let errorText = await decryptResponse.text();
+                    try {
+                        const errorJson = JSON.parse(errorText);
+                        if (errorJson.message) errorText = errorJson.message;
+                    } catch {}
+                    throw new Error(`Decryption failed: ${errorText}`);
+                }
+                
+                // Get the decrypted image as a blob and display it
+                const decryptedBlob = await decryptResponse.blob();
+                const url = URL.createObjectURL(decryptedBlob);
+                document.getElementById('decryptedImage').src = url;
+                statusElement.textContent = "Image retrieved and decrypted successfully!";
+                statusElement.className = "status success";
+                
+            } catch (error) {
+                console.error('Server decryption error:', error);
+                statusElement.textContent = `Server decryption failed: ${error.message}`;
+                statusElement.className = "status error";
+            }
+            return;
+        }
+
+        // Local decryption flow (unchanged)
+        // Check if an image has been uploaded (only for local decryption)
+        if (!originalImageData) {
+            statusElement.textContent = "Please upload an image first.";
             statusElement.className = "status error";
             return;
         }
@@ -451,6 +559,7 @@ async function handleDecrypt() {
 async function handleDownloadDecrypted() {
     const statusElement = document.getElementById('decryptionStatus');
     const decryptedImage = document.getElementById('decryptedImage');
+    const decryptionKey = document.getElementById('decryptionKey').value;
     
     try {
         if (!decryptedImage || !decryptedImage.src) {
@@ -459,16 +568,48 @@ async function handleDownloadDecrypted() {
             return;
         }
         
+        if (!decryptionKey) {
+            statusElement.textContent = "Please enter the decryption key.";
+            statusElement.className = "status error";
+            return;
+        }
+        
         statusElement.textContent = "Preparing download...";
         statusElement.className = "status loading";
         
-        // Create a download link
+        // Get the image data from the src
+        const response = await fetch(decryptedImage.src);
+        const blob = await response.blob();
+        
+        // Create a FormData object to send to the server
+        const formData = new FormData();
+        formData.append('file', blob, 'image.enc');
+        formData.append('key', decryptionKey);
+        
+        // Use the specialized endpoint for downloading properly formatted images
+        const downloadResponse = await fetch('http://localhost:8083/api/get-decrypted-image', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!downloadResponse.ok) {
+            throw new Error(`Failed to format image for download: ${downloadResponse.status}`);
+        }
+        
+        // Get the properly formatted image as a blob
+        const formattedImageBlob = await downloadResponse.blob();
+        
+        // Create a download link with the proper file extension
+        const downloadUrl = URL.createObjectURL(formattedImageBlob);
         const link = document.createElement('a');
-        link.href = decryptedImage.src;
+        link.href = downloadUrl;
         link.download = 'decrypted_image.png';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        // Clean up the URL object
+        URL.revokeObjectURL(downloadUrl);
         
         statusElement.textContent = "Image downloaded successfully!";
         statusElement.className = "status success";
@@ -576,3 +717,21 @@ document.addEventListener('DOMContentLoaded', function() {
         updateOperationParams();
     }
 });
+
+// Add this function to app.js
+function showStatus(element, message, type) {
+    console.log('Status:', type, message);
+    if (element) {
+        element.textContent = message;
+        element.className = 'status ' + type;
+        
+        // Clear status after delay
+        const currentMessage = message;
+        setTimeout(() => {
+            if (element.textContent === currentMessage) {
+                element.textContent = '';
+                element.className = 'status';
+            }
+        }, 5000);
+    }
+}
